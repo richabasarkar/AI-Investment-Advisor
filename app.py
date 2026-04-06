@@ -87,7 +87,7 @@ Prioritize:
 """
     try:
         response = client.chat.completions.create(
-            model="gpt‑5.4-mini",
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
         text_response = response.choices[0].message.content
