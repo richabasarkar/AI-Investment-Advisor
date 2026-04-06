@@ -3,8 +3,11 @@ import yfinance as yf
 from openai import OpenAI
 import os
 import json
+import time
 
+# -----------------------
 # Initialize OpenAI client
+# -----------------------
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.title("AI Investment Advisor")
@@ -35,25 +38,31 @@ user_profile = {
 }
 
 # -----------------------
-# Stock Input
+# Helper Functions
 # -----------------------
-ticker = st.text_input("Enter a stock ticker (e.g., AAPL)")
-
-def get_stock_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        return {
-            "Price": info.get("currentPrice"),
-            "Price to Earnings Ratio": info.get("trailingPE"),
-            "Beta": info.get("beta"),
-            "Debt to Equity Ratio": info.get("debtToEquity"),
-            "Revenue Growth": info.get("revenueGrowth")
-        }
-    except:
-        return None
+def fetch_stock_data(ticker, retries=2):
+    """Fetch stock data robustly with retries."""
+    ticker = ticker.upper().strip()
+    for attempt in range(retries + 1):
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            # Check critical fields
+            if "regularMarketPrice" in info:
+                return {
+                    "Price": info.get("currentPrice"),
+                    "Price to Earnings Ratio": info.get("trailingPE"),
+                    "Beta": info.get("beta"),
+                    "Debt to Equity Ratio": info.get("debtToEquity"),
+                    "Revenue Growth": info.get("revenueGrowth")
+                }
+        except Exception:
+            pass
+        time.sleep(1)
+    return None
 
 def generate_response(profile, data, ticker):
+    """Call OpenAI to get structured AI analysis."""
     prompt = f"""
 You are an AI investment analyst. User wants personalized advice.
 
@@ -76,25 +85,36 @@ Prioritize:
 - Debt financing options if user selected Debt Financing
 - Long-term growth if user horizon is Long
 """
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
     try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
         text_response = response.choices[0].message.content
-        return json.loads(text_response)
-    except:
-        # fallback if JSON fails
-        return {"error": "Could not parse AI response", "raw_response": text_response}
+        # Parse JSON
+        analysis = json.loads(text_response)
+        # Format string fields in uppercase
+        for key, value in analysis.items():
+            if isinstance(value, str):
+                analysis[key] = value.upper()
+        return analysis
+    except Exception as e:
+        return {"error": f"AI response error: {e}", "raw_response": text_response if 'text_response' in locals() else None}
 
-if ticker:
-    data = get_stock_data(ticker)
+# -----------------------
+# Main UI
+# -----------------------
+ticker_input = st.text_input("Enter a stock ticker (e.g., AAPL)")
+
+if ticker_input:
+    data = fetch_stock_data(ticker_input)
     if data is None:
-        st.error("Invalid ticker or no data found.")
+        st.error(f"No valid data found for {ticker_input.upper()}")
     else:
         st.subheader("Stock Data")
-        st.write(data)
+        st.json(data)
         if st.button("Analyze"):
-            analysis = generate_response(user_profile, data, ticker)
-            st.subheader("AI Analysis")
-            st.json(analysis)
+            with st.spinner("Analyzing stock with AI..."):
+                analysis = generate_response(user_profile, data, ticker_input)
+                st.subheader("AI Analysis")
+                st.json(analysis)
