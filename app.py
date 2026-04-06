@@ -44,11 +44,11 @@ def get_stock_data(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         return {
-            "price": info.get("currentPrice"),
-            "pe": info.get("trailingPE"),
-            "beta": info.get("beta"),
-            "debt_to_equity": info.get("debtToEquity"),
-            "revenue_growth": info.get("revenueGrowth")
+            "Price": info.get("currentPrice"),
+            "Price to Earnings Ratio": info.get("trailingPE"),
+            "Beta": info.get("beta"),
+            "Debt to Equity Ratio": info.get("debtToEquity"),
+            "Revenue Growth": info.get("revenueGrowth")
         }
     except:
         return None
