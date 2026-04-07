@@ -243,28 +243,37 @@ if "rec_analysis_cache" not in st.session_state:
 def get_stock_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-        
-        # Use fast_info for price and reliable metrics
+        # fast_info is more reliable for current price
         fast_info = getattr(stock, "fast_info", {})
-        price = fast_info.get("last_price", None)
+        price = fast_info.get("last_price")
+        open_price = fast_info.get("open", None)
+        day_high = fast_info.get("day_high", None)
+        day_low = fast_info.get("day_low", None)
+        previous_close = fast_info.get("previous_close", None)
         beta = fast_info.get("beta", None)
 
-        # Use info for P/E, Debt/Equity, Revenue Growth
+        # info can still give P/E, Debt/Equity, Revenue Growth for stocks
         info = getattr(stock, "info", {})
-        pe = info.get("trailingPE", None)
-        de_ratio = info.get("debtToEquity", None)
-        rev_growth = info.get("revenueGrowth", None)
+        pe = info.get("trailingPE")
+        de_ratio = info.get("debtToEquity")
+        rev_growth = info.get("revenueGrowth")
 
-        # Return metrics even if some are missing
         metrics = {
             "Price": price,
-            "Price to Earnings Ratio": pe,
+            "Open": open_price,
+            "High": day_high,
+            "Low": day_low,
+            "Previous Close": previous_close,
+            "P/E": pe,
             "Beta": beta,
-            "Debt to Equity Ratio": de_ratio,
+            "Debt/Equity": de_ratio,
             "Revenue Growth": rev_growth
         }
 
         history = stock.history(period="6mo")
+        if history.empty:
+            history = None
+
         return metrics, history
     except Exception as e:
         print(f"Error fetching stock data for {ticker}: {e}")
@@ -413,24 +422,39 @@ with tab0:
 # -----------------------
 with tab1:
     if st.session_state.last_ticker:
-        data, history = get_stock_data(st.session_state.last_ticker)
-        if data is None:
-            st.error(f"No valid data found for {st.session_state.last_ticker}")
-        else:
-            col1, col2, col3, col4, col5 = st.columns(5)
-            def fmt(val):
-                return round(val, 2) if val else "N/A"
-            col1.metric("Price", f"${fmt(data['Price'])}")
-            col2.metric("P/E", fmt(data["Price to Earnings Ratio"]))
-            col3.metric("Beta", fmt(data["Beta"]))
-            col4.metric("Debt/Equity", fmt(data["Debt to Equity Ratio"]))
-            col5.metric("Revenue Growth", fmt(data["Revenue Growth"]))
+        current_ticker = st.session_state.last_ticker
+        data, history = get_stock_data(current_ticker)
 
-            if history is not None and not history.empty:
+        if data is None:
+            st.error(f"No valid data found for {current_ticker}")
+        else:
+            st.markdown(f"### 📈 Data for {current_ticker}")
+
+            # Display available metrics dynamically
+            cols = st.columns(5)
+            for i, (key, val) in enumerate(data.items()):
+                if i >= 5:  # max 5 metrics per row
+                    cols = st.columns(5)
+                    i = 0
+                display_val = f"{round(val, 2)}" if isinstance(val, (int, float)) else (val if val else "N/A")
+                cols[i].metric(label=key, value=display_val)
+
+            # Display 6-month chart if available
+            if history is not None:
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines"))
-                fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", font=dict(color="#111111"))
+                fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines", name="Close"))
+                fig.update_layout(
+                    title=f"{current_ticker} 6-Month Price History",
+                    xaxis_title="Date",
+                    yaxis_title="Price ($)",
+                    paper_bgcolor="#ffffff",
+                    plot_bgcolor="#ffffff",
+                    font=dict(color="#111111"),
+                    height=450
+                )
                 st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No historical data available to plot.")
 
 # -----------------------
 # AI Analysis Tab
