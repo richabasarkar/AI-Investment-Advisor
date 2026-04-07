@@ -124,19 +124,19 @@ if ticker:
         st.markdown(f"**Debt to Equity Ratio:** {data.get('Debt to Equity Ratio', 'N/A')}")
         st.markdown(f"**Revenue Growth:** {data.get('Revenue Growth', 'N/A')}")
 
-        if st.button("Analyze"):
+        with st.spinner("Analyzing..."):
             analysis = generate_response(user_profile, data, ticker)
-            st.subheader("AI Analysis")
 
-            if "error" in analysis:
-                st.error(analysis["error"])
-                if analysis.get("raw_response"):
-                    st.text(analysis["raw_response"])
-            else:
-                st.markdown(f"**Recommendation:** {analysis.get('Recommendation', 'N/A')}")
-                st.markdown(f"**Reasoning:** {analysis.get('Reasoning', 'N/A')}")
-                st.markdown(f"**Risk Rating:** {analysis.get('Risk Rating', 'N/A')}")
-                st.markdown(f"**Alignment with Goals:** {analysis.get('Alignment with Goals', 'N/A')}")
+        st.subheader("AI Analysis")
+        if "error" in analysis:
+            st.error(analysis["error"])
+            if analysis.get("raw_response"):
+                st.text(analysis["raw_response"])
+        else:
+            st.markdown(f"**Recommendation:** {analysis.get('Recommendation', 'N/A')}")
+            st.markdown(f"**Reasoning:** {analysis.get('Reasoning', 'N/A')}")
+            st.markdown(f"**Risk Rating:** {analysis.get('Risk Rating', 'N/A')}")
+            st.markdown(f"**Alignment with Goals:** {analysis.get('Alignment with Goals', 'N/A')}")
 
         # -----------------------
         # Follow-up Chat
