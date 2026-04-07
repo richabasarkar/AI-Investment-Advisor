@@ -15,47 +15,174 @@ st.set_page_config(
 )
 
 # -----------------------
-# Session State Init
+# Custom CSS (LIGHT THEME)
 # -----------------------
-if "selected_ticker" not in st.session_state:
-    st.session_state.selected_ticker = ""
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f5f7fb;
+        color: #111111;
+    }
 
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = 0
+    .header-banner {
+        background: #ffffff;
+        border: 1px solid #e2e6ef;
+        border-radius: 16px;
+        padding: 36px 40px;
+        margin-bottom: 32px;
+    }
+    .header-banner h1 {
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: #111111;
+    }
+    .header-banner p {
+        color: #555;
+    }
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    .metric-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e6ef;
+        border-radius: 12px;
+        padding: 20px 24px;
+        text-align: center;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    .metric-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #111111;
+    }
 
-if "last_ticker" not in st.session_state:
-    st.session_state.last_ticker = ""
+    .analysis-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e6ef;
+        border-radius: 12px;
+        padding: 24px 28px;
+        margin-bottom: 16px;
+    }
+    .analysis-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    .analysis-value {
+        font-size: 1rem;
+        color: #222;
+        line-height: 1.6;
+    }
+
+    .badge-buy {
+        background-color: #e6f4ea;
+        color: #1e7e34;
+        border: 1px solid #1e7e34;
+        border-radius: 8px;
+        padding: 6px 16px;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    .badge-avoid {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #721c24;
+        border-radius: 8px;
+        padding: 6px 16px;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    .badge-hold {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #856404;
+        border-radius: 8px;
+        padding: 6px 16px;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        background-color: #ffffff;
+        border-radius: 14px;
+        padding: 10px;
+        border: 1px solid #e2e6ef;
+        margin-bottom: 20px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background-color: #f1f3f8;
+        color: #444;
+        border-radius: 10px;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e4e8f2;
+        color: #000;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: #dfe6f3 !important;
+        color: #000 !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .stTextInput > div > div > input {
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        color: #111111;
+        border-radius: 10px;
+        padding: 12px 16px;
+        font-size: 1rem;
+    }
+
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e6ef;
+    }
+
+    hr {
+        border-color: #e2e6ef;
+    }
+
+    [data-testid="stChatMessage"] {
+        background-color: #ffffff;
+        border: 1px solid #e2e6ef;
+        border-radius: 12px;
+        margin-bottom: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # -----------------------
-# Custom CSS
-# -----------------------
-st.markdown("""<style>
-.stApp { background-color: #f5f7fb; color: #111; }
-.header-banner { background:#fff; border:1px solid #e2e6ef; border-radius:16px; padding:36px 40px; margin-bottom:32px;}
-.analysis-card { background:#fff; border:1px solid #e2e6ef; border-radius:12px; padding:20px; margin-bottom:10px;}
-.stTabs [data-baseweb="tab-list"] { gap:20px; background:#fff; border-radius:14px; padding:10px; border:1px solid #e2e6ef;}
-</style>""", unsafe_allow_html=True)
-
-# -----------------------
-# OpenAI Client
+# Initialize OpenAI client
 # -----------------------
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # -----------------------
-# Header
+# Header Banner
 # -----------------------
 st.markdown("""
 <div class="header-banner">
-<h1>📈 AI Investment Advisor</h1>
-<p>Discover, analyze, and explore stocks personalized to your preferences.</p>
+    <h1>📈 AI Investment Advisor</h1>
+    <p>Enter a stock ticker to get real-time data, AI-powered analysis, and personalized insights based on your investment profile.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # -----------------------
-# Sidebar
+# Sidebar Inputs
 # -----------------------
 st.sidebar.markdown("## Your Preferences")
 
@@ -80,19 +207,20 @@ user_profile = {
 }
 
 # -----------------------
-# Stock Input (CONNECTED)
+# Stock Input
 # -----------------------
-ticker_input = st.text_input(
-    "🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)",
-    value=st.session_state.selected_ticker
-)
-
+ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)")
 ticker = ticker_input.upper().strip() if ticker_input else ""
 
-# Reset chat when ticker changes
-if ticker != st.session_state.last_ticker:
-    st.session_state.chat_history = []
+if "last_ticker" not in st.session_state:
     st.session_state.last_ticker = ticker
+    st.session_state.chat_history = []
+    st.session_state.active_tab = 0
+else:
+    if ticker and ticker != st.session_state.last_ticker:
+        st.session_state.last_ticker = ticker
+        st.session_state.chat_history = []
+        st.session_state.active_tab = 0
 
 # -----------------------
 # Data Functions
@@ -119,149 +247,175 @@ def get_stock_data(ticker):
 @st.cache_data(ttl=3600)
 def generate_response(profile, data, ticker):
     prompt = f"""
-User Profile: {profile}
-Stock Data: {data}
+You are an AI investment analyst.
 
-Return JSON:
+User Profile:
+{profile}
+
+Stock Data:
+{data}
+
+Return ONLY valid JSON:
 {{
-"Recommendation":"Buy/Hold/Avoid",
-"Reasoning":"...",
-"Risk Rating":"Low/Medium/High",
-"Alignment with Goals":"..."
+  "Recommendation": "Buy / Hold / Avoid",
+  "Reasoning": "...",
+  "Risk Rating": "Low / Medium / High",
+  "Alignment with Goals": "..."
 }}
 """
     try:
-        res = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        return json.loads(res.choices[0].message.content)
+        text_response = response.choices[0].message.content.strip()
+        return json.loads(text_response)
     except Exception as e:
         return {"error": str(e)}
 
 @st.cache_data(ttl=3600)
 def generate_recommendations(profile):
     prompt = f"""
-User Profile: {profile}
-Suggest 5 stocks.
+You are an AI investment advisor.
 
-Return JSON list:
-[{{"ticker":"AAPL","company":"Apple Inc."}}]
+User Profile:
+{profile}
+
+Suggest 5 stocks that match this profile.
+
+Return ONLY valid JSON in this format:
+[
+  {{"ticker": "AAPL", "company": "Apple Inc."}},
+  {{"ticker": "MSFT", "company": "Microsoft Corporation"}}
+]
 """
     try:
-        res = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        return json.loads(res.choices[0].message.content)
+        text_response = response.choices[0].message.content.strip()
+        return json.loads(text_response)
     except Exception as e:
         return {"error": str(e)}
 
 # -----------------------
-# Tabs (ALWAYS VISIBLE)
+# Tabs
 # -----------------------
-tab0, tab1, tab2, tab3 = st.tabs(
-    ["Recommendations", "Stock Data", "AI Analysis", "Chat"]
-)
+tab_labels = ["Recommendations", "Stock Data", "AI Analysis", "Chat"]
+tab0, tab1, tab2, tab3 = st.tabs(tab_labels)
 
 # -----------------------
-# Recommendations (HOME)
+# Recommendations Tab
 # -----------------------
 with tab0:
     st.markdown("### 📊 Recommended Stocks For You")
-
     recs = generate_recommendations(str(user_profile))
 
-    if isinstance(recs, dict):
+    if isinstance(recs, dict) and "error" in recs:
         st.error(recs["error"])
     else:
+        cols = st.columns(5)
         for i, stock in enumerate(recs):
-            t = stock.get("ticker")
-            c = stock.get("company")
+            ticker_symbol = stock.get("ticker", "N/A")
+            company_name = stock.get("company", "N/A")
 
-            col1, col2 = st.columns([4, 1])
-
-            with col1:
+            with cols[i]:
                 st.markdown(f"""
                 <div class="analysis-card">
-                <b>{t}</b><br>{c}
+                    <div class="analysis-label">{ticker_symbol}</div>
+                    <div class="analysis-value">{company_name}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            with col2:
-                if st.button("Select", key=f"sel_{i}"):
-                    st.session_state.selected_ticker = t
-                    st.session_state.active_tab = 1  # go to Stock Data
-                    st.rerun()
+                if st.button(f"Select {ticker_symbol}", key=f"rec_{i}"):
+                    st.session_state.last_ticker = ticker_symbol
+                    st.session_state.chat_history = []
+                    st.session_state.active_tab = 1
+                    st.experimental_rerun()
 
 # -----------------------
-# Stock Data
+# Stock Data Tab
 # -----------------------
 with tab1:
-    if not ticker:
-        st.info("Select a stock from Recommendations.")
-    else:
-        data, history = get_stock_data(ticker)
-
+    if st.session_state.last_ticker:
+        data, history = get_stock_data(st.session_state.last_ticker)
         if data is None:
-            st.error("No data found.")
+            st.error(f"No valid data found for {st.session_state.last_ticker}")
         else:
-            cols = st.columns(5)
-
-            def fmt(v): return round(v, 2) if v else "N/A"
-
-            cols[0].metric("Price", f"${fmt(data['Price'])}")
-            cols[1].metric("P/E", fmt(data["Price to Earnings Ratio"]))
-            cols[2].metric("Beta", fmt(data["Beta"]))
-            cols[3].metric("Debt/Equity", fmt(data["Debt to Equity Ratio"]))
-            cols[4].metric("Revenue Growth", fmt(data["Revenue Growth"]))
+            col1, col2, col3, col4, col5 = st.columns(5)
+            def fmt(val):
+                return round(val, 2) if val else "N/A"
+            col1.metric("Price", f"${fmt(data['Price'])}")
+            col2.metric("P/E", fmt(data["Price to Earnings Ratio"]))
+            col3.metric("Beta", fmt(data["Beta"]))
+            col4.metric("Debt/Equity", fmt(data["Debt to Equity Ratio"]))
+            col5.metric("Revenue Growth", fmt(data["Revenue Growth"]))
 
             if history is not None and not history.empty:
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=history.index,
-                    y=history["Close"],
-                    mode="lines"
-                ))
+                fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines"))
+                fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", font=dict(color="#111111"))
                 st.plotly_chart(fig, use_container_width=True)
 
 # -----------------------
-# AI Analysis
+# AI Analysis Tab
 # -----------------------
 with tab2:
-    if not ticker:
-        st.info("Select a stock first.")
-    else:
+    if st.session_state.last_ticker:
         if st.button("Analyze"):
-            analysis = generate_response(str(user_profile), str(data), ticker)
-
+            analysis = generate_response(str(user_profile), str(data), st.session_state.last_ticker)
             if "error" in analysis:
                 st.error(analysis["error"])
             else:
-                st.write(analysis)
+                st.markdown(f"Recommendation: {analysis.get('Recommendation', 'N/A')}")
+                st.write(analysis.get("Reasoning", "N/A"))
+                st.markdown("Risk Rating")
+                st.write(analysis.get("Risk Rating", "N/A"))
+                st.markdown("Alignment with Goals")
+                st.write(analysis.get("Alignment with Goals", "N/A"))
 
 # -----------------------
-# Chat
+# Chat Tab
 # -----------------------
 with tab3:
-    if not ticker:
-        st.info("Select a stock first.")
-    else:
-        q = st.text_input("Ask about this stock")
+    if st.session_state.last_ticker:
+        st.markdown("### Ask about this stock")
+        user_q = st.text_input("Type your question here:")
 
-        if st.button("Send"):
-            msgs = [{"role": "system", "content": f"{user_profile} {data}"}]
-            msgs += st.session_state.chat_history
-            msgs.append({"role": "user", "content": q})
+        if st.button("Send Question"):
+            if not user_q:
+                st.warning("Please enter a question first!")
+            else:
+                if "chat_history" not in st.session_state:
+                    st.session_state.chat_history = []
 
-            res = client.chat.completions.create(
-                model="gpt-5-mini",
-                messages=msgs
-            )
+                # Build context using current selected ticker & stock data
+                context_prompt = f"""
+You are an AI investment analyst.
 
-            ans = res.choices[0].message.content
+User Profile:
+{user_profile}
 
-            st.session_state.chat_history.append({"role": "user", "content": q})
-            st.session_state.chat_history.append({"role": "assistant", "content": ans})
+Stock Ticker: {st.session_state.last_ticker}
+Stock Data:
+{data}
+"""
 
-            st.write(ans)
+                chat_messages = [{"role": "system", "content": context_prompt}]
+                for msg in st.session_state.chat_history:
+                    chat_messages.append(msg)
+
+                chat_messages.append({"role": "user", "content": user_q})
+
+                try:
+                    response = client.chat.completions.create(model="gpt-5-mini", messages=chat_messages)
+                    answer = response.choices[0].message.content
+
+                    st.session_state.chat_history.append({"role": "user", "content": user_q})
+                    st.session_state.chat_history.append({"role": "assistant", "content": answer})
+
+                    st.markdown("**AI Response:**")
+                    st.write(answer)
+                except Exception as e:
+                    st.error(f"Error generating response: {e}")
