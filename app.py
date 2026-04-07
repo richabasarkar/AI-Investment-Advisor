@@ -218,7 +218,7 @@ if "last_ticker" not in st.session_state or st.session_state.last_ticker != tick
 # -----------------------
 # Data Functions
 # -----------------------
-@st.cache_data
+@st.cache_data(ttl=300)  # refresh every 5 minutes
 def get_stock_data(ticker):
     try:
         stock = yf.Ticker(ticker)
