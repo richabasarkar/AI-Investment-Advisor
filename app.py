@@ -282,7 +282,10 @@ You are an AI investment advisor.
 User Profile:
 {profile}
 
-Suggest 5 stocks that match this profile.
+Your task:
+1. Suggest 10 stocks that could match this profile.
+2. For each stock, internally analyze its risk, alignment with user goals, and suitability based on the profile.
+3. Return the **top 5 stocks** that best match this profile.
 
 Return ONLY valid JSON in this format:
 [
@@ -290,15 +293,12 @@ Return ONLY valid JSON in this format:
   {{"ticker": "MSFT", "company": "Microsoft Corporation"}}
 ]
 """
-    try:
-        response = client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        text_response = response.choices[0].message.content.strip()
-        return json.loads(text_response)
-    except Exception as e:
-        return {"error": str(e)}
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    text_response = response.choices[0].message.content.strip()
+    return json.loads(text_response)
 
 # -----------------------
 # Tabs
