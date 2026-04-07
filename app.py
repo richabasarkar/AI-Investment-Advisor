@@ -257,7 +257,7 @@ Return ONLY valid JSON:
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         text_response = response.choices[0].message.content.strip()
@@ -308,20 +308,20 @@ if ticker:
                 if "error" in analysis:
                     st.error(analysis["error"])
                 else:
-                    st.markdown(f"### 📌 Recommendation: {analysis.get('Recommendation', 'N/A')}")
+                    st.markdown(f"Recommendation: {analysis.get('Recommendation', 'N/A')}")
                     st.write(analysis.get("Reasoning", "N/A"))
 
-                    st.markdown(f"### ⚠️ Risk Rating")
+                    st.markdown(f"Risk Rating")
                     st.write(analysis.get("Risk Rating", "N/A"))
 
-                    st.markdown(f"### 🎯 Alignment with Goals")
+                    st.markdown(f"Alignment with Goals")
                     st.write(analysis.get("Alignment with Goals", "N/A"))
 
         with tab3:
             user_q = st.text_input("Ask about this stock")
             if user_q:
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-5-mini",
                     messages=[{"role": "user", "content": user_q}]
                 )
                 st.write(response.choices[0].message.content)
