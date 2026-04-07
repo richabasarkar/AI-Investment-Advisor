@@ -40,6 +40,11 @@ user_profile = {
 ticker_input = st.text_input("Enter a stock ticker (e.g., AAPL)")
 ticker = ticker_input.upper() if ticker_input else ""
 
+# Reset chat history if ticker changes
+if "last_ticker" not in st.session_state or st.session_state.last_ticker != ticker:
+    st.session_state.chat_history = []
+    st.session_state.last_ticker = ticker
+
 # -----------------------
 # Caching stock data and AI analysis
 # -----------------------
@@ -88,15 +93,14 @@ Prioritize:
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-5-mini",  # ✅ Valid API model
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         text_response = response.choices[0].message.content.strip()
-        
+
         if not text_response:
             return {"error": "AI returned empty response", "raw_response": None}
 
-        # Parse JSON
         try:
             return json.loads(text_response)
         except json.JSONDecodeError:
@@ -115,7 +119,61 @@ if ticker:
     else:
         st.subheader("Stock Data")
         st.write(data)
+
         if st.button("Analyze"):
             analysis = generate_response(user_profile, data, ticker)
             st.subheader("AI Analysis")
-            st.json(analysis)
+
+            if "error" in analysis:
+                st.error(analysis["error"])
+                if analysis.get("raw_response"):
+                    st.text(analysis["raw_response"])
+            else:
+                st.markdown(f"**Recommendation:** {analysis.get('Recommendation', 'N/A')}")
+                st.markdown(f"**Reasoning:** {analysis.get('Reasoning', 'N/A')}")
+                st.markdown(f"**Risk Rating:** {analysis.get('Risk Rating', 'N/A')}")
+                st.markdown(f"**Alignment with Goals:** {analysis.get('Alignment with Goals', 'N/A')}")
+
+        # -----------------------
+        # Follow-up Chat
+        # -----------------------
+        st.divider()
+        st.subheader("Ask a Follow-up Question")
+
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        user_question = st.chat_input("Ask anything about this stock...")
+
+        if user_question:
+            st.session_state.chat_history.append({"role": "user", "content": user_question})
+            with st.chat_message("user"):
+                st.markdown(user_question)
+
+            system_msg = {
+                "role": "system",
+                "content": (
+                    f"You are an AI investment analyst. The user is asking about {ticker}. "
+                    f"Stock data: {json.dumps(data)}. "
+                    f"User profile: {json.dumps(user_profile)}. "
+                    "Answer clearly and concisely in plain text, no JSON."
+                )
+            }
+            messages = [system_msg] + [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.chat_history
+            ]
+
+            try:
+                chat_response = client.chat.completions.create(
+                    model="gpt-5-mini",
+                    messages=messages
+                )
+                reply = chat_response.choices[0].message.content.strip()
+            except Exception as e:
+                reply = f"Error getting response: {e}"
+
+            st.session_state.chat_history.append({"role": "assistant", "content": reply})
+            with st.chat_message("assistant"):
+                st.markdown(reply)
