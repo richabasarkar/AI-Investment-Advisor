@@ -210,6 +210,7 @@ user_profile = {
 ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)")
 ticker = ticker_input.upper().strip() if ticker_input else ""
 
+# Reset chat history if ticker changed
 if "last_ticker" not in st.session_state or st.session_state.last_ticker != ticker:
     st.session_state.chat_history = []
     st.session_state.last_ticker = ticker
@@ -276,6 +277,9 @@ if ticker:
     else:
         tab1, tab2, tab3 = st.tabs(["Stock Data", "AI Analysis", "Chat"])
 
+        # -----------------------
+        # Stock Data Tab
+        # -----------------------
         with tab1:
             col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -302,6 +306,9 @@ if ticker:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
+        # -----------------------
+        # AI Analysis Tab
+        # -----------------------
         with tab2:
             if st.button("Analyze"):
                 analysis = generate_response(str(user_profile), str(data), ticker)
@@ -317,11 +324,55 @@ if ticker:
                     st.markdown(f"Alignment with Goals")
                     st.write(analysis.get("Alignment with Goals", "N/A"))
 
+        # -----------------------
+        # Chat Tab
+        # -----------------------
         with tab3:
-            user_q = st.text_input("Ask about this stock")
-            if user_q:
-                response = client.chat.completions.create(
-                    model="gpt-5-mini",
-                    messages=[{"role": "user", "content": user_q}]
-                )
-                st.write(response.choices[0].message.content)
+            st.markdown("### Ask about this stock")
+            user_q = st.text_input("Type your question here:")
+
+            if st.button("Send Question"):
+                if not user_q:
+                    st.warning("Please enter a question first!")
+                else:
+                    # Initialize chat history if not already
+                    if "chat_history" not in st.session_state:
+                        st.session_state.chat_history = []
+
+                    # Build context prompt
+                    context_prompt = f"""
+You are an AI investment analyst.
+
+User Profile:
+{user_profile}
+
+Stock Ticker: {ticker}
+Stock Data:
+{data}
+"""
+
+                    # Add previous chat messages
+                    chat_messages = [{"role": "system", "content": context_prompt}]
+                    for msg in st.session_state.chat_history:
+                        chat_messages.append(msg)
+
+                    # Add current user question
+                    chat_messages.append({"role": "user", "content": user_q})
+
+                    # Get AI response
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-5-mini",
+                            messages=chat_messages
+                        )
+                        answer = response.choices[0].message.content
+
+                        # Save question & answer to chat history
+                        st.session_state.chat_history.append({"role": "user", "content": user_q})
+                        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+
+                        st.markdown("**AI Response:**")
+                        st.write(answer)
+
+                    except Exception as e:
+                        st.error(f"Error generating response: {e}")
