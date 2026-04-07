@@ -209,7 +209,7 @@ user_profile = {
 # -----------------------
 # Stock Input
 # -----------------------
-ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)", 
+ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)",
                              value=st.session_state.get("ticker_input", ""))
 ticker = ticker_input.upper().strip() if ticker_input else ""
 
@@ -217,11 +217,15 @@ if "last_ticker" not in st.session_state:
     st.session_state.last_ticker = ticker
     st.session_state.chat_history = []
     st.session_state.active_tab = 0
+    st.session_state.rec_analysis_cache = {}
 else:
     if ticker and ticker != st.session_state.last_ticker:
         st.session_state.last_ticker = ticker
         st.session_state.chat_history = []
         st.session_state.active_tab = 0
+
+if "rec_analysis_cache" not in st.session_state:
+    st.session_state.rec_analysis_cache = {}
 
 # -----------------------
 # Data Functions
@@ -246,40 +250,7 @@ def get_stock_data(ticker):
         return None, None
 
 @st.cache_data(ttl=3600)
-def generate_response(profile, data, ticker):
-    prompt = f"""
-You are an AI investment analyst.
-
-User Profile:
-{profile}
-
-Stock Data:
-{data}
-
-Return ONLY valid JSON:
-{{
-  "Recommendation": "Buy / Hold / Avoid",
-  "Reasoning": "...",
-  "Risk Rating": "Low / Medium / High",
-  "Alignment with Goals": "..."
-}}
-"""
-    try:
-        response = client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        text_response = response.choices[0].message.content.strip()
-        return json.loads(text_response)
-    except Exception as e:
-        return {"error": str(e)}
-
-# -----------------------
-# FIXED: generate_recommendations
-# -----------------------
-@st.cache_data(ttl=3600)
 def generate_recommendations(risk, horizon, goal, sectors, investment_type):
-    # Build investment-type-specific instructions
     type_instructions = {
         "Stocks": "Recommend individual stocks (equities) only. Use standard stock tickers (e.g. AAPL, MSFT).",
         "ETFs": "Recommend ETFs (Exchange-Traded Funds) only. Use ETF tickers (e.g. VOO, QQQ, ARKK, XLK). Do NOT recommend individual stocks.",
@@ -320,13 +291,27 @@ USER PROFILE:
 STRICT RULES:
 1. {type_instructions.get(investment_type, 'Recommend appropriate securities.')}
 2. All recommendations MUST match the investment type above. This is non-negotiable.
-3. Recommend exactly 5 options that best fit the user's full profile.
-4. Each recommendation must have a one-sentence reason explaining why it fits this user.
-5. Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
+3. Recommend exactly 5 options that genuinely fit this user's profile.
+4. For EACH recommendation, you must also provide:
+   - A "recommendation" verdict: ONLY "Buy" or "Hold" (never "Avoid" — if you would avoid it, pick a different one)
+   - A "reasoning" field explaining why it fits this specific user's profile
+   - A "risk_rating" of Low, Medium, or High
+   - An "alignment" field explaining how it aligns with the user's goal
+   - A one-sentence "reason" summary for the card display
+5. Every ticker you return must be one you are genuinely recommending as Buy or Hold for this user. Do not include anything you would tell this user to avoid.
+6. Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
 
 OUTPUT FORMAT:
 [
-  {{"ticker": "TICKER", "company": "Full Name", "reason": "One sentence why this fits the user."}},
+  {{
+    "ticker": "TICKER",
+    "company": "Full Name",
+    "reason": "One sentence why this fits the user.",
+    "recommendation": "Buy",
+    "reasoning": "Detailed reasoning tied to the user profile.",
+    "risk_rating": "Low",
+    "alignment": "Explanation of how this aligns with the user's goal."
+  }},
   ...
 ]
 """
@@ -337,7 +322,6 @@ OUTPUT FORMAT:
             messages=[{"role": "user", "content": prompt}]
         )
         text_response = response.choices[0].message.content.strip()
-        # Strip markdown code fences if present
         if text_response.startswith("```"):
             text_response = text_response.split("```")[1]
             if text_response.startswith("json"):
@@ -364,11 +348,30 @@ with tab0:
     if isinstance(recs, dict) and "error" in recs:
         st.error(f"Could not generate recommendations: {recs['error']}")
     else:
+        # Cache the full analysis from recommendations so AI Analysis tab can read it
+        for stock in recs:
+            t = stock.get("ticker")
+            if t and t not in st.session_state.rec_analysis_cache:
+                st.session_state.rec_analysis_cache[t] = {
+                    "Recommendation": stock.get("recommendation", "Hold"),
+                    "Reasoning": stock.get("reasoning", ""),
+                    "Risk Rating": stock.get("risk_rating", ""),
+                    "Alignment with Goals": stock.get("alignment", "")
+                }
+
         cols = st.columns(5)
+        badge_map = {
+            "Buy": "badge-buy",
+            "Hold": "badge-hold",
+            "Avoid": "badge-avoid"
+        }
+
         for i, stock in enumerate(recs[:5]):
             ticker_symbol = stock.get("ticker", "N/A")
             company_name = stock.get("company", "N/A")
             reason = stock.get("reason", "")
+            verdict = stock.get("recommendation", "Hold")
+            badge_class = badge_map.get(verdict, "badge-hold")
 
             with cols[i]:
                 st.markdown(f"""
@@ -376,6 +379,9 @@ with tab0:
                     <div class="analysis-label">{ticker_symbol}</div>
                     <div class="analysis-value"><strong>{company_name}</strong></div>
                     <hr style="margin: 10px 0;">
+                    <div style="margin-bottom: 10px;">
+                        <span class="{badge_class}">{verdict}</span>
+                    </div>
                     <div style="font-size: 0.8rem; color: #555;">{reason}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -415,17 +421,91 @@ with tab1:
 # -----------------------
 with tab2:
     if st.session_state.last_ticker:
-        if st.button("Analyze"):
-            analysis = generate_response(str(user_profile), str(data), st.session_state.last_ticker)
-            if "error" in analysis:
-                st.error(analysis["error"])
-            else:
-                st.markdown(f"Recommendation: {analysis.get('Recommendation', 'N/A')}")
-                st.write(analysis.get("Reasoning", "N/A"))
-                st.markdown("Risk Rating")
-                st.write(analysis.get("Risk Rating", "N/A"))
-                st.markdown("Alignment with Goals")
-                st.write(analysis.get("Alignment with Goals", "N/A"))
+        current_ticker = st.session_state.last_ticker
+        cached_analysis = st.session_state.rec_analysis_cache.get(current_ticker)
+
+        if cached_analysis:
+            # Show the pre-computed analysis from the recommendation step
+            st.markdown(f"### Analysis for {current_ticker}")
+            st.caption("This analysis was generated alongside the recommendation to ensure consistency.")
+
+            verdict = cached_analysis.get("Recommendation", "Hold")
+            badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
+
+            st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
+            st.markdown("---")
+
+            st.markdown(f"""
+            <div class="analysis-card">
+                <div class="analysis-label">Reasoning</div>
+                <div class="analysis-value">{cached_analysis.get("Reasoning", "N/A")}</div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-label">Risk Rating</div>
+                <div class="analysis-value">{cached_analysis.get("Risk Rating", "N/A")}</div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-label">Alignment with Goals</div>
+                <div class="analysis-value">{cached_analysis.get("Alignment with Goals", "N/A")}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        else:
+            # Ticker was manually entered, not from recommendations — run fresh analysis
+            st.markdown(f"### Analysis for {current_ticker}")
+            st.caption("This ticker was entered manually. Running a fresh analysis.")
+
+            if st.button("Analyze"):
+                data, _ = get_stock_data(current_ticker)
+                if data is None:
+                    st.error("Could not fetch stock data for analysis.")
+                else:
+                    prompt = f"""
+You are an AI investment analyst.
+
+User Profile:
+{user_profile}
+
+Stock Data:
+{data}
+
+Return ONLY valid JSON:
+{{
+  "Recommendation": "Buy / Hold / Avoid",
+  "Reasoning": "...",
+  "Risk Rating": "Low / Medium / High",
+  "Alignment with Goals": "..."
+}}
+"""
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-5-mini",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        text_response = response.choices[0].message.content.strip()
+                        analysis = json.loads(text_response)
+                        st.session_state.rec_analysis_cache[current_ticker] = analysis
+
+                        verdict = analysis.get("Recommendation", "Hold")
+                        badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
+                        st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
+                        st.markdown("---")
+                        st.markdown(f"""
+                        <div class="analysis-card">
+                            <div class="analysis-label">Reasoning</div>
+                            <div class="analysis-value">{analysis.get("Reasoning", "N/A")}</div>
+                        </div>
+                        <div class="analysis-card">
+                            <div class="analysis-label">Risk Rating</div>
+                            <div class="analysis-value">{analysis.get("Risk Rating", "N/A")}</div>
+                        </div>
+                        <div class="analysis-card">
+                            <div class="analysis-label">Alignment with Goals</div>
+                            <div class="analysis-value">{analysis.get("Alignment with Goals", "N/A")}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Error generating analysis: {e}")
 
 # -----------------------
 # Chat Tab
@@ -441,6 +521,8 @@ with tab3:
             else:
                 if "chat_history" not in st.session_state:
                     st.session_state.chat_history = []
+
+                data, _ = get_stock_data(st.session_state.last_ticker)
 
                 context_prompt = f"""
 You are an AI investment analyst.
