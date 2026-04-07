@@ -241,39 +241,44 @@ if "rec_analysis_cache" not in st.session_state:
 # -----------------------
 @st.cache_data(ttl=300)
 def get_stock_data(ticker):
+    """
+    Fetch live stock/ETF/option data from yfinance.
+    Handles missing fields gracefully and returns metrics + history.
+    """
     try:
         stock = yf.Ticker(ticker)
 
-        # Fetch fast_info for reliable metrics
-        fi = getattr(stock, "fast_info", {})
-        last_price = fi.get("last_price", "N/A")
-        prev_close = fi.get("previous_close", "N/A")
-        day_high = fi.get("day_high", "N/A")
-        day_low = fi.get("day_low", "N/A")
-        open_price = fi.get("open", "N/A")
-        beta = fi.get("beta", "N/A")
+        # live fast_info values (preferred)
+        fast_info = getattr(stock, "fast_info", {})
+        price = fast_info.get("last_price") or fast_info.get("lastPrice")
+        open_price = fast_info.get("open")
+        day_high = fast_info.get("day_high")
+        day_low = fast_info.get("day_low")
+        prev_close = fast_info.get("previous_close") or fast_info.get("previousClose")
+        beta = fast_info.get("beta")
 
-        # Fetch info for supplemental metrics
+        # fallback info
         info = getattr(stock, "info", {})
+        pe = info.get("trailingPE")
+        de_ratio = info.get("debtToEquity")
+        rev_growth = info.get("revenueGrowth")
         name = info.get("shortName") or info.get("longName") or ticker
-        pe = info.get("trailingPE", "N/A")
-        de_ratio = info.get("debtToEquity", "N/A")
-        rev_growth = info.get("revenueGrowth", "N/A")
 
+        # Build metrics dict
         metrics = {
             "Company": name,
-            "Price": last_price,
-            "Open": open_price,
-            "High": day_high,
-            "Low": day_low,
-            "Previous Close": prev_close,
-            "P/E": pe,
-            "Beta": beta,
-            "Debt/Equity": de_ratio,
-            "Revenue Growth": rev_growth
+            "Price": price if price is not None else "N/A",
+            "Open": open_price if open_price is not None else "N/A",
+            "High": day_high if day_high is not None else "N/A",
+            "Low": day_low if day_low is not None else "N/A",
+            "Previous Close": prev_close if prev_close is not None else "N/A",
+            "P/E": pe if pe is not None else "N/A",
+            "Beta": beta if beta is not None else "N/A",
+            "Debt/Equity": de_ratio if de_ratio is not None else "N/A",
+            "Revenue Growth": rev_growth if rev_growth is not None else "N/A"
         }
 
-        # Fetch history for chart only (optional)
+        # attempt 6-month history
         try:
             history = stock.history(period="6mo")
             if history.empty:
@@ -282,6 +287,100 @@ def get_stock_data(ticker):
             history = None
 
         return metrics, history
+
     except Exception as e:
-        print(f"Error fetching {ticker}: {e}")
+        print(f"Error fetching data for {ticker}: {e}")
         return {}, None
+
+# -----------------------
+# generate_recommendations function
+# (unchanged)
+# -----------------------
+@st.cache_data(ttl=3600)
+def generate_recommendations(risk, horizon, goal, sectors, investment_type, option_types=[]):
+    type_instructions = {
+        "Stocks": "Recommend individual stocks (equities) only. Use standard stock tickers (e.g. AAPL, MSFT).",
+        "ETFs": "Recommend ETFs (Exchange-Traded Funds) only. Use ETF tickers (e.g. VOO, QQQ, ARKK, XLK). Do NOT recommend individual stocks.",
+        "Bonds": "Recommend bond ETFs or bond funds only (e.g. BND, TLT, AGG, GOVT, HYG). Do NOT recommend individual stocks or equity ETFs.",
+        "Debt Financing": "Recommend fixed-income instruments and debt-focused funds only, such as corporate bond ETFs, treasury funds, or BDCs (e.g. BND, LQD, BIZD, ARCC). Do NOT recommend equity stocks.",
+        "Options": f"Recommend options based on user preference. Focus on types: {', '.join(option_types) if option_types else 'any option type'}."
+    }
+
+    sector_note = f"Focus on these sectors: {', '.join(sectors)}." if sectors else "No specific sector preference — diversify across sectors."
+
+    risk_guidance = {
+        "Low": "Prioritize capital preservation and low volatility. Avoid speculative or high-beta assets.",
+        "Medium": "Balance growth and stability. Moderate volatility is acceptable.",
+        "High": "Prioritize high growth potential. Volatility and risk are acceptable."
+    }
+
+    horizon_guidance = {
+        "Short": "Investment horizon is short-term (under 1 year). Prefer liquid, lower-duration assets.",
+        "Medium": "Investment horizon is medium-term (1–5 years). Balance between growth and stability.",
+        "Long": "Investment horizon is long-term (5+ years). Growth-oriented assets with compounding potential are preferred."
+    }
+
+    goal_guidance = {
+        "Growth": "The user wants capital appreciation above all else.",
+        "Stable Income": "The user wants consistent dividends or interest income.",
+        "Capital Preservation": "The user wants to protect their principal from loss."
+    }
+
+    prompt = f"""
+You are an expert financial advisor helping a beginner investor find their first investments.
+
+USER PROFILE:
+- Investment Type: {investment_type}
+- Option Type(s): {', '.join(option_types) if option_types else 'N/A'}
+- Risk Tolerance: {risk} — {risk_guidance.get(risk, '')}
+- Investment Horizon: {horizon} — {horizon_guidance.get(horizon, '')}
+- Investment Goal: {goal} — {goal_guidance.get(goal, '')}
+- Sector Preference: {sector_note}
+
+STRICT RULES:
+1. {type_instructions.get(investment_type, 'Recommend appropriate securities.')}
+2. All recommendations MUST match the investment type above. This is non-negotiable.
+3. Recommend exactly 5 options that genuinely fit this user's profile.
+4. For EACH recommendation, you must also provide:
+   - A "recommendation" verdict: ONLY "Buy" or "Hold" (never "Avoid" — if you would avoid it, pick a different one)
+   - A "reasoning" field explaining why it fits this specific user's profile
+   - A "risk_rating" of Low, Medium, or High
+   - An "alignment" field explaining how it aligns with the user's goal
+   - A one-sentence "reason" summary for the card display
+5. Every ticker you return must be one you are genuinely recommending as Buy or Hold for this user. Do not include anything you would tell this user to avoid.
+6. Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
+
+OUTPUT FORMAT:
+[
+  {{
+    "ticker": "TICKER",
+    "company": "Full Name",
+    "reason": "One sentence why this fits the user.",
+    "recommendation": "Buy",
+    "reasoning": "Detailed reasoning tied to the user profile.",
+    "risk_rating": "Low",
+    "alignment": "Explanation of how this aligns with the user's goal."
+  }},
+  ...
+]
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        text_response = response.choices[0].message.content.strip()
+        if text_response.startswith("```"):
+            text_response = text_response.split("```")[1]
+            if text_response.startswith("json"):
+                text_response = text_response[4:]
+        return json.loads(text_response.strip())
+    except Exception as e:
+        return {"error": str(e)}
+
+# -----------------------
+# Tabs and the rest of the app
+# (unchanged)
+# -----------------------
+tab_labels = ["Recommendations", "Stock Data", "AI Analysis", "Chat"]
+tab0, tab1, tab2, tab3 = st.tabs(tab_labels)
