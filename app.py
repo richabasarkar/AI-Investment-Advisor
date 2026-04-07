@@ -348,7 +348,6 @@ with tab0:
     if isinstance(recs, dict) and "error" in recs:
         st.error(f"Could not generate recommendations: {recs['error']}")
     else:
-        # Cache the full analysis from recommendations so AI Analysis tab can read it
         for stock in recs:
             t = stock.get("ticker")
             if t and t not in st.session_state.rec_analysis_cache:
@@ -359,12 +358,7 @@ with tab0:
                     "Alignment with Goals": stock.get("alignment", "")
                 }
 
-        cols = st.columns(5)
-        badge_map = {
-            "Buy": "badge-buy",
-            "Hold": "badge-hold",
-            "Avoid": "badge-avoid"
-        }
+        badge_map = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}
 
         for i, stock in enumerate(recs[:5]):
             ticker_symbol = stock.get("ticker", "N/A")
@@ -373,24 +367,24 @@ with tab0:
             verdict = stock.get("recommendation", "Hold")
             badge_class = badge_map.get(verdict, "badge-hold")
 
-            with cols[i]:
-                st.markdown(f"""
-                <div class="analysis-card">
-                    <div class="analysis-label">{ticker_symbol}</div>
-                    <div class="analysis-value"><strong>{company_name}</strong></div>
-                    <hr style="margin: 10px 0;">
-                    <div style="margin-bottom: 10px;">
-                        <span class="{badge_class}">{verdict}</span>
-                    </div>
-                    <div style="font-size: 0.8rem; color: #555;">{reason}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            col_badge, col_ticker, col_name, col_reason, col_btn = st.columns([1, 1, 2, 4, 1.2])
 
-                if st.button(f"Select {ticker_symbol}", key=f"rec_{i}"):
+            with col_badge:
+                st.markdown(f'<div style="padding-top:8px"><span class="{badge_class}">{verdict}</span></div>', unsafe_allow_html=True)
+            with col_ticker:
+                st.markdown(f'<div style="padding-top:10px; font-weight:700; font-size:1rem;">{ticker_symbol}</div>', unsafe_allow_html=True)
+            with col_name:
+                st.markdown(f'<div style="padding-top:10px; color:#444;">{company_name}</div>', unsafe_allow_html=True)
+            with col_reason:
+                st.markdown(f'<div style="padding-top:10px; font-size:0.85rem; color:#555;">{reason}</div>', unsafe_allow_html=True)
+            with col_btn:
+                if st.button(f"Select", key=f"rec_{i}"):
                     st.session_state.last_ticker = ticker_symbol
-                    st.session_state.chat_history = []
-                    st.session_state.active_tab = 1
                     st.session_state.ticker_input = ticker_symbol
+                    st.session_state.chat_history = []
+                    st.rerun()
+
+            st.markdown("<hr style='margin: 6px 0; border-color:#e2e6ef;'>", unsafe_allow_html=True)
 
 # -----------------------
 # Stock Data Tab
