@@ -243,19 +243,31 @@ if "rec_analysis_cache" not in st.session_state:
 def get_stock_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-        info = stock.info
-        if "currentPrice" not in info:
-            return None, None
+        
+        # Use fast_info for price and reliable metrics
+        fast_info = getattr(stock, "fast_info", {})
+        price = fast_info.get("last_price", None)
+        beta = fast_info.get("beta", None)
+
+        # Use info for P/E, Debt/Equity, Revenue Growth
+        info = getattr(stock, "info", {})
+        pe = info.get("trailingPE", None)
+        de_ratio = info.get("debtToEquity", None)
+        rev_growth = info.get("revenueGrowth", None)
+
+        # Return metrics even if some are missing
         metrics = {
-            "Price": info.get("currentPrice"),
-            "Price to Earnings Ratio": info.get("trailingPE"),
-            "Beta": info.get("beta"),
-            "Debt to Equity Ratio": info.get("debtToEquity"),
-            "Revenue Growth": info.get("revenueGrowth")
+            "Price": price,
+            "Price to Earnings Ratio": pe,
+            "Beta": beta,
+            "Debt to Equity Ratio": de_ratio,
+            "Revenue Growth": rev_growth
         }
+
         history = stock.history(period="6mo")
         return metrics, history
-    except:
+    except Exception as e:
+        print(f"Error fetching stock data for {ticker}: {e}")
         return None, None
 
 @st.cache_data(ttl=3600)
