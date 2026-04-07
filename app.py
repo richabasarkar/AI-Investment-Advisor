@@ -241,44 +241,40 @@ if "rec_analysis_cache" not in st.session_state:
 # -----------------------
 @st.cache_data(ttl=300)
 def get_stock_data(ticker):
-    """
-    Fetch live stock/ETF/option data from yfinance.
-    Handles missing fields gracefully and returns metrics + history.
-    """
     try:
         stock = yf.Ticker(ticker)
 
-        # live fast_info values (preferred)
+        # Use fast_info first (more reliable)
         fast_info = getattr(stock, "fast_info", {})
-        price = fast_info.get("last_price") or fast_info.get("lastPrice")
+        price = fast_info.get("last_price")
         open_price = fast_info.get("open")
         day_high = fast_info.get("day_high")
         day_low = fast_info.get("day_low")
-        prev_close = fast_info.get("previous_close") or fast_info.get("previousClose")
+        prev_close = fast_info.get("previous_close")
         beta = fast_info.get("beta")
 
-        # fallback info
+        # info fallback
         info = getattr(stock, "info", {})
         pe = info.get("trailingPE")
         de_ratio = info.get("debtToEquity")
         rev_growth = info.get("revenueGrowth")
         name = info.get("shortName") or info.get("longName") or ticker
 
-        # Build metrics dict
+        # Build metrics dict (show N/A if missing)
         metrics = {
             "Company": name,
-            "Price": price if price is not None else "N/A",
-            "Open": open_price if open_price is not None else "N/A",
-            "High": day_high if day_high is not None else "N/A",
-            "Low": day_low if day_low is not None else "N/A",
-            "Previous Close": prev_close if prev_close is not None else "N/A",
-            "P/E": pe if pe is not None else "N/A",
-            "Beta": beta if beta is not None else "N/A",
-            "Debt/Equity": de_ratio if de_ratio is not None else "N/A",
-            "Revenue Growth": rev_growth if rev_growth is not None else "N/A"
+            "Price": price or "N/A",
+            "Open": open_price or "N/A",
+            "High": day_high or "N/A",
+            "Low": day_low or "N/A",
+            "Previous Close": prev_close or "N/A",
+            "P/E": pe or "N/A",
+            "Beta": beta or "N/A",
+            "Debt/Equity": de_ratio or "N/A",
+            "Revenue Growth": rev_growth or "N/A"
         }
 
-        # attempt 6-month history
+        # Attempt history (6 months)
         try:
             history = stock.history(period="6mo")
             if history.empty:
@@ -290,12 +286,8 @@ def get_stock_data(ticker):
 
     except Exception as e:
         print(f"Error fetching data for {ticker}: {e}")
-        return {}, None
+        return {}, None  # return empty metrics dict instead of None
 
-# -----------------------
-# generate_recommendations function
-# (unchanged)
-# -----------------------
 @st.cache_data(ttl=3600)
 def generate_recommendations(risk, horizon, goal, sectors, investment_type, option_types=[]):
     type_instructions = {
@@ -379,8 +371,155 @@ OUTPUT FORMAT:
         return {"error": str(e)}
 
 # -----------------------
-# Tabs and the rest of the app
-# (unchanged)
+# Tabs
 # -----------------------
 tab_labels = ["Recommendations", "Stock Data", "AI Analysis", "Chat"]
 tab0, tab1, tab2, tab3 = st.tabs(tab_labels)
+
+# -----------------------
+# Recommendations Tab
+# -----------------------
+with tab0:
+    st.markdown("### 📊 Recommended for You")
+    st.caption(f"Based on: **{investment_type}** · **{risk} Risk** · **{horizon}-term** · **{goal}**")
+
+    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type, option_types)
+
+    if isinstance(recs, dict) and "error" in recs:
+        st.error(f"Could not generate recommendations: {recs['error']}")
+    else:
+        for stock in recs:
+            t = stock.get("ticker")
+            if t and t not in st.session_state.rec_analysis_cache:
+                st.session_state.rec_analysis_cache[t] = {
+                    "Recommendation": stock.get("recommendation", "Hold"),
+                    "Reasoning": stock.get("reasoning", ""),
+                    "Risk Rating": stock.get("risk_rating", ""),
+                    "Alignment with Goals": stock.get("alignment", "")
+                }
+
+        badge_map = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}
+
+        for i, stock in enumerate(recs[:5]):
+            ticker_symbol = stock.get("ticker", "N/A")
+            company_name = stock.get("company", "N/A")
+            reason = stock.get("reason", "")
+            verdict = stock.get("recommendation", "Hold")
+            badge_class = badge_map.get(verdict, "badge-hold")
+
+            col_badge, col_ticker, col_name, col_reason, col_btn = st.columns([1, 1, 2, 4, 1.2])
+
+            with col_badge:
+                st.markdown(f'<div style="padding-top:8px"><span class="{badge_class}">{verdict}</span></div>', unsafe_allow_html=True)
+            with col_ticker:
+                st.markdown(f'<div style="padding-top:10px; font-weight:700; font-size:1rem;">{ticker_symbol}</div>', unsafe_allow_html=True)
+            with col_name:
+                st.markdown(f'<div style="padding-top:10px; color:#444;">{company_name}</div>', unsafe_allow_html=True)
+            with col_reason:
+                st.markdown(f'<div style="padding-top:10px; font-size:0.85rem; color:#555;">{reason}</div>', unsafe_allow_html=True)
+            with col_btn:
+                if st.button(f"Select", key=f"rec_{i}"):
+                    st.session_state.last_ticker = ticker_symbol
+                    st.session_state.ticker_input = ticker_symbol
+                    st.session_state.chat_history = []
+                    st.rerun()
+
+            st.markdown("<hr style='margin: 6px 0; border-color:#e2e6ef;'>", unsafe_allow_html=True)
+
+# -----------------------
+# Stock Data Tab
+# -----------------------
+with tab1:
+    current_ticker = st.session_state.last_ticker
+    if current_ticker:
+        data, history = get_stock_data(current_ticker)
+
+        if not data:
+            st.error(f"No data found for {current_ticker}. Make sure the ticker is valid.")
+        else:
+            st.markdown(f"### 📈 Data for {current_ticker}")
+
+            # Show metrics dynamically (max 5 per row)
+            metric_keys = list(data.keys())
+            for i in range(0, len(metric_keys), 5):
+                cols = st.columns(5)
+                for j, key in enumerate(metric_keys[i:i+5]):
+                    val = data[key]
+                    display_val = f"{round(val,2)}" if isinstance(val, (int,float)) else val
+                    cols[j].metric(label=key, value=display_val)
+
+            # Show chart if available
+            if history is not None:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines", name="Close"))
+                fig.update_layout(
+                    title=f"{current_ticker} 6-Month Price History",
+                    xaxis_title="Date",
+                    yaxis_title="Price ($)",
+                    paper_bgcolor="#ffffff",
+                    plot_bgcolor="#ffffff",
+                    font=dict(color="#111111"),
+                    height=450
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No historical data available for chart.")
+# -----------------------
+# AI Analysis Tab
+# -----------------------
+with tab2:
+    if st.session_state.last_ticker:
+        current_ticker = st.session_state.last_ticker
+        cached_analysis = st.session_state.rec_analysis_cache.get(current_ticker)
+
+        if cached_analysis:
+            st.markdown(f"### Analysis for {current_ticker}")
+            st.caption("This analysis was generated alongside the recommendation to ensure consistency.")
+
+            verdict = cached_analysis.get("Recommendation", "Hold")
+            badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
+
+            st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
+            st.markdown("---")
+
+            st.markdown(f"""
+            <div class="analysis-card">
+                <div class="analysis-label">Reasoning</div>
+                <div class="analysis-value">{cached_analysis.get("Reasoning", "N/A")}</div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-label">Risk Rating</div>
+                <div class="analysis-value">{cached_analysis.get("Risk Rating", "N/A")}</div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-label">Alignment with Goals</div>
+                <div class="analysis-value">{cached_analysis.get("Alignment with Goals", "N/A")}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        else:
+            st.markdown(f"### Analysis for {current_ticker}")
+            st.info("Analysis will appear once you generate recommendations.")
+
+# -----------------------
+# Chat Tab
+# -----------------------
+with tab3:
+    st.markdown("### 💬 Ask About This Investment")
+    chat_input = st.text_input("Ask a question about this investment...", key="chat_input")
+    if chat_input and st.session_state.last_ticker:
+        st.session_state.chat_history.append({"role": "user", "content": chat_input})
+        messages = [{"role": "system", "content": "You are a helpful AI financial assistant."}]
+        messages += st.session_state.chat_history
+        try:
+            resp = client.chat.completions.create(model="gpt-5-mini", messages=messages)
+            answer = resp.choices[0].message.content
+            st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        except Exception as e:
+            st.error(f"Error generating response: {e}")
+
+    for chat in st.session_state.chat_history:
+        if chat["role"] == "user":
+            st.markdown(f"**You:** {chat['content']}")
+        else:
+            st.markdown(f"**AI:** {chat['content']}")
