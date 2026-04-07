@@ -243,41 +243,50 @@ if "rec_analysis_cache" not in st.session_state:
 def get_stock_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-        # fast_info is more reliable for current price
+
+        # Use fast_info first (more reliable)
         fast_info = getattr(stock, "fast_info", {})
         price = fast_info.get("last_price")
-        open_price = fast_info.get("open", None)
-        day_high = fast_info.get("day_high", None)
-        day_low = fast_info.get("day_low", None)
-        previous_close = fast_info.get("previous_close", None)
-        beta = fast_info.get("beta", None)
+        open_price = fast_info.get("open")
+        day_high = fast_info.get("day_high")
+        day_low = fast_info.get("day_low")
+        prev_close = fast_info.get("previous_close")
+        beta = fast_info.get("beta")
 
-        # info can still give P/E, Debt/Equity, Revenue Growth for stocks
+        # info fallback
         info = getattr(stock, "info", {})
         pe = info.get("trailingPE")
         de_ratio = info.get("debtToEquity")
         rev_growth = info.get("revenueGrowth")
+        name = info.get("shortName") or info.get("longName") or ticker
 
+        # Build metrics dict (show N/A if missing)
         metrics = {
-            "Price": price,
-            "Open": open_price,
-            "High": day_high,
-            "Low": day_low,
-            "Previous Close": previous_close,
-            "P/E": pe,
-            "Beta": beta,
-            "Debt/Equity": de_ratio,
-            "Revenue Growth": rev_growth
+            "Company": name,
+            "Price": price or "N/A",
+            "Open": open_price or "N/A",
+            "High": day_high or "N/A",
+            "Low": day_low or "N/A",
+            "Previous Close": prev_close or "N/A",
+            "P/E": pe or "N/A",
+            "Beta": beta or "N/A",
+            "Debt/Equity": de_ratio or "N/A",
+            "Revenue Growth": rev_growth or "N/A"
         }
 
-        history = stock.history(period="6mo")
-        if history.empty:
+        # Attempt history (6 months)
+        try:
+            history = stock.history(period="6mo")
+            if history.empty:
+                history = None
+        except:
             history = None
 
         return metrics, history
+
     except Exception as e:
-        print(f"Error fetching stock data for {ticker}: {e}")
-        return None, None
+        print(f"Error fetching data for {ticker}: {e}")
+        return {}, None  # return empty metrics dict instead of None
 
 @st.cache_data(ttl=3600)
 def generate_recommendations(risk, horizon, goal, sectors, investment_type, option_types=[]):
@@ -421,25 +430,25 @@ with tab0:
 # Stock Data Tab
 # -----------------------
 with tab1:
-    if st.session_state.last_ticker:
-        current_ticker = st.session_state.last_ticker
+    current_ticker = st.session_state.last_ticker
+    if current_ticker:
         data, history = get_stock_data(current_ticker)
 
-        if data is None:
-            st.error(f"No valid data found for {current_ticker}")
+        if not data:
+            st.error(f"No data found for {current_ticker}. Make sure the ticker is valid.")
         else:
             st.markdown(f"### 📈 Data for {current_ticker}")
 
-            # Display available metrics dynamically
-            cols = st.columns(5)
-            for i, (key, val) in enumerate(data.items()):
-                if i >= 5:  # max 5 metrics per row
-                    cols = st.columns(5)
-                    i = 0
-                display_val = f"{round(val, 2)}" if isinstance(val, (int, float)) else (val if val else "N/A")
-                cols[i].metric(label=key, value=display_val)
+            # Show metrics dynamically (max 5 per row)
+            metric_keys = list(data.keys())
+            for i in range(0, len(metric_keys), 5):
+                cols = st.columns(5)
+                for j, key in enumerate(metric_keys[i:i+5]):
+                    val = data[key]
+                    display_val = f"{round(val,2)}" if isinstance(val, (int,float)) else val
+                    cols[j].metric(label=key, value=display_val)
 
-            # Display 6-month chart if available
+            # Show chart if available
             if history is not None:
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines", name="Close"))
@@ -454,8 +463,7 @@ with tab1:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("No historical data available to plot.")
-
+                st.info("No historical data available for chart.")
 # -----------------------
 # AI Analysis Tab
 # -----------------------
