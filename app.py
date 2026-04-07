@@ -3,11 +3,8 @@ import yfinance as yf
 from openai import OpenAI
 import os
 import json
-import time
 
-# -----------------------
 # Initialize OpenAI client
-# -----------------------
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.title("AI Investment Advisor")
@@ -38,31 +35,33 @@ user_profile = {
 }
 
 # -----------------------
-# Helper Functions
+# Stock Input
 # -----------------------
-def fetch_stock_data(ticker, retries=2):
-    """Fetch stock data robustly with retries."""
-    ticker = ticker.upper().strip()
-    for attempt in range(retries + 1):
-        try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
-            # Check critical fields
-            if "regularMarketPrice" in info:
-                return {
-                    "Price": info.get("currentPrice"),
-                    "Price to Earnings Ratio": info.get("trailingPE"),
-                    "Beta": info.get("beta"),
-                    "Debt to Equity Ratio": info.get("debtToEquity"),
-                    "Revenue Growth": info.get("revenueGrowth")
-                }
-        except Exception:
-            pass
-        time.sleep(1)
-    return None
+ticker_input = st.text_input("Enter a stock ticker (e.g., AAPL)")
+ticker = ticker_input.upper() if ticker_input else ""
 
+# -----------------------
+# Caching stock data and AI analysis
+# -----------------------
+@st.cache_data
+def get_stock_data(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        if "currentPrice" not in info:
+            return None
+        return {
+            "Price": info.get("currentPrice"),
+            "Price to Earnings Ratio": info.get("trailingPE"),
+            "Beta": info.get("beta"),
+            "Debt to Equity Ratio": info.get("debtToEquity"),
+            "Revenue Growth": info.get("revenueGrowth")
+        }
+    except:
+        return None
+
+@st.cache_data
 def generate_response(profile, data, ticker):
-    """Call OpenAI to get structured AI analysis."""
     prompt = f"""
 You are an AI investment analyst. User wants personalized advice.
 
@@ -72,13 +71,15 @@ User Profile:
 Stock Data:
 {data}
 
-Return a structured JSON response like this:
+Return a structured JSON response EXACTLY in this format:
 {{
-  "recommendation": "Buy / Hold / Avoid",
-  "reasoning": "Explain why this stock fits the user profile",
-  "risk_rating": "Low / Medium / High",
-  "alignment": "How well it matches user's goal, risk, horizon, and investment type"
+  "Recommendation": "Buy / Hold / Avoid",
+  "Reasoning": "Explain why this stock fits the user profile",
+  "Risk Rating": "Low / Medium / High",
+  "Alignment with Goals": "How well it matches user's goal, risk, horizon, and investment type"
 }}
+
+Strictly use JSON, do not add explanations outside JSON.
 
 Prioritize:
 - Low-risk options for users with Low risk tolerance
@@ -87,34 +88,34 @@ Prioritize:
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5-mini",  # ✅ Valid API model
             messages=[{"role": "user", "content": prompt}]
         )
-        text_response = response.choices[0].message.content
+        text_response = response.choices[0].message.content.strip()
+        
+        if not text_response:
+            return {"error": "AI returned empty response", "raw_response": None}
+
         # Parse JSON
-        analysis = json.loads(text_response)
-        # Format string fields in uppercase
-        for key, value in analysis.items():
-            if isinstance(value, str):
-                analysis[key] = value.upper()
-        return analysis
+        try:
+            return json.loads(text_response)
+        except json.JSONDecodeError:
+            return {"error": "AI returned invalid JSON", "raw_response": text_response}
+
     except Exception as e:
-        return {"error": f"AI response error: {e}", "raw_response": text_response if 'text_response' in locals() else None}
+        return {"error": f"AI response error: {e}", "raw_response": None}
 
 # -----------------------
-# Main UI
+# Show stock data and analysis
 # -----------------------
-ticker_input = st.text_input("Enter a stock ticker (e.g., AAPL)")
-
-if ticker_input:
-    data = fetch_stock_data(ticker_input)
+if ticker:
+    data = get_stock_data(ticker)
     if data is None:
-        st.error(f"No valid data found for {ticker_input.upper()}")
+        st.error(f"No valid data found for {ticker}")
     else:
         st.subheader("Stock Data")
-        st.json(data)
+        st.write(data)
         if st.button("Analyze"):
-            with st.spinner("Analyzing stock with AI..."):
-                analysis = generate_response(user_profile, data, ticker_input)
-                st.subheader("AI Analysis")
-                st.json(analysis)
+            analysis = generate_response(user_profile, data, ticker)
+            st.subheader("AI Analysis")
+            st.json(analysis)
