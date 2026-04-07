@@ -274,31 +274,77 @@ Return ONLY valid JSON:
     except Exception as e:
         return {"error": str(e)}
 
+# -----------------------
+# FIXED: generate_recommendations
+# -----------------------
 @st.cache_data(ttl=3600)
-def generate_recommendations(profile):
+def generate_recommendations(risk, horizon, goal, sectors, investment_type):
+    # Build investment-type-specific instructions
+    type_instructions = {
+        "Stocks": "Recommend individual stocks (equities) only. Use standard stock tickers (e.g. AAPL, MSFT).",
+        "ETFs": "Recommend ETFs (Exchange-Traded Funds) only. Use ETF tickers (e.g. VOO, QQQ, ARKK, XLK). Do NOT recommend individual stocks.",
+        "Bonds": "Recommend bond ETFs or bond funds only (e.g. BND, TLT, AGG, GOVT, HYG). Do NOT recommend individual stocks or equity ETFs.",
+        "Debt Financing": "Recommend fixed-income instruments and debt-focused funds only, such as corporate bond ETFs, treasury funds, or BDCs (e.g. BND, LQD, BIZD, ARCC). Do NOT recommend equity stocks."
+    }
+
+    sector_note = f"Focus on these sectors: {', '.join(sectors)}." if sectors else "No specific sector preference — diversify across sectors."
+
+    risk_guidance = {
+        "Low": "Prioritize capital preservation and low volatility. Avoid speculative or high-beta assets.",
+        "Medium": "Balance growth and stability. Moderate volatility is acceptable.",
+        "High": "Prioritize high growth potential. Volatility and risk are acceptable."
+    }
+
+    horizon_guidance = {
+        "Short": "Investment horizon is short-term (under 1 year). Prefer liquid, lower-duration assets.",
+        "Medium": "Investment horizon is medium-term (1–5 years). Balance between growth and stability.",
+        "Long": "Investment horizon is long-term (5+ years). Growth-oriented assets with compounding potential are preferred."
+    }
+
+    goal_guidance = {
+        "Growth": "The user wants capital appreciation above all else.",
+        "Stable Income": "The user wants consistent dividends or interest income.",
+        "Capital Preservation": "The user wants to protect their principal from loss."
+    }
+
     prompt = f"""
-You are an AI investment advisor.
+You are an expert financial advisor helping a beginner investor find their first investments.
 
-User Profile:
-{profile}
+USER PROFILE:
+- Investment Type: {investment_type}
+- Risk Tolerance: {risk} — {risk_guidance.get(risk, '')}
+- Investment Horizon: {horizon} — {horizon_guidance.get(horizon, '')}
+- Investment Goal: {goal} — {goal_guidance.get(goal, '')}
+- Sector Preference: {sector_note}
 
-Your task:
-1. Suggest 10 stocks that could match this profile.
-2. For each stock, internally analyze its risk, alignment with user goals, and suitability based on the profile.
-3. Return the **top 5 stocks** that best match this profile.
+STRICT RULES:
+1. {type_instructions.get(investment_type, 'Recommend appropriate securities.')}
+2. All recommendations MUST match the investment type above. This is non-negotiable.
+3. Recommend exactly 5 options that best fit the user's full profile.
+4. Each recommendation must have a one-sentence reason explaining why it fits this user.
+5. Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
 
-Return ONLY valid JSON in this format:
+OUTPUT FORMAT:
 [
-  {{"ticker": "AAPL", "company": "Apple Inc."}},
-  {{"ticker": "MSFT", "company": "Microsoft Corporation"}}
+  {{"ticker": "TICKER", "company": "Full Name", "reason": "One sentence why this fits the user."}},
+  ...
 ]
 """
-    response = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    text_response = response.choices[0].message.content.strip()
-    return json.loads(text_response)
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        text_response = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if text_response.startswith("```"):
+            text_response = text_response.split("```")[1]
+            if text_response.startswith("json"):
+                text_response = text_response[4:]
+        return json.loads(text_response.strip())
+    except Exception as e:
+        return {"error": str(e)}
 
 # -----------------------
 # Tabs
@@ -310,30 +356,34 @@ tab0, tab1, tab2, tab3 = st.tabs(tab_labels)
 # Recommendations Tab
 # -----------------------
 with tab0:
-    st.markdown("### 📊 Recommended Stocks For You")
-    recs = generate_recommendations(str(user_profile))
+    st.markdown("### 📊 Recommended for You")
+    st.caption(f"Based on: **{investment_type}** · **{risk} Risk** · **{horizon}-term** · **{goal}**")
+
+    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type)
 
     if isinstance(recs, dict) and "error" in recs:
-        st.error(recs["error"])
+        st.error(f"Could not generate recommendations: {recs['error']}")
     else:
         cols = st.columns(5)
-        for i, stock in enumerate(recs):
+        for i, stock in enumerate(recs[:5]):
             ticker_symbol = stock.get("ticker", "N/A")
             company_name = stock.get("company", "N/A")
+            reason = stock.get("reason", "")
 
             with cols[i]:
                 st.markdown(f"""
                 <div class="analysis-card">
                     <div class="analysis-label">{ticker_symbol}</div>
-                    <div class="analysis-value">{company_name}</div>
+                    <div class="analysis-value"><strong>{company_name}</strong></div>
+                    <hr style="margin: 10px 0;">
+                    <div style="font-size: 0.8rem; color: #555;">{reason}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 if st.button(f"Select {ticker_symbol}", key=f"rec_{i}"):
-                    # Instead of st.experimental_rerun(), just set session_state
                     st.session_state.last_ticker = ticker_symbol
                     st.session_state.chat_history = []
-                    st.session_state.active_tab = 1  # auto switch to Stock Data tab
+                    st.session_state.active_tab = 1
                     st.session_state.ticker_input = ticker_symbol
 
 # -----------------------
@@ -392,7 +442,6 @@ with tab3:
                 if "chat_history" not in st.session_state:
                     st.session_state.chat_history = []
 
-                # Build context using current selected ticker & stock data
                 context_prompt = f"""
 You are an AI investment analyst.
 
