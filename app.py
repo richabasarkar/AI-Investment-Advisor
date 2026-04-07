@@ -109,18 +109,32 @@ st.markdown("""
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 20px;
         background-color: #ffffff;
-        border-radius: 12px;
-        padding: 6px;
+        border-radius: 14px;
+        padding: 10px;
         border: 1px solid #e2e6ef;
+        margin-bottom: 20px;
     }
+
     .stTabs [data-baseweb="tab"] {
-        color: #666;
+        background-color: #f1f3f8;
+        color: #444;
+        border-radius: 10px;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.2s ease;
     }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e4e8f2;
+        color: #000;
+    }
+
     .stTabs [aria-selected="true"] {
-        background-color: #e9eef6 !important;
-        color: #111 !important;
+        background-color: #dfe6f3 !important;
+        color: #000 !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     }
 
     .stTextInput > div > div > input {
@@ -291,7 +305,17 @@ if ticker:
         with tab2:
             if st.button("Analyze"):
                 analysis = generate_response(str(user_profile), str(data), ticker)
-                st.json(analysis)
+                if "error" in analysis:
+                    st.error(analysis["error"])
+                else:
+                    st.markdown(f"### 📌 Recommendation: {analysis.get('Recommendation', 'N/A')}")
+                    st.write(analysis.get("Reasoning", "N/A"))
+
+                    st.markdown(f"### ⚠️ Risk Rating")
+                    st.write(analysis.get("Risk Rating", "N/A"))
+
+                    st.markdown(f"### 🎯 Alignment with Goals")
+                    st.write(analysis.get("Alignment with Goals", "N/A"))
 
         with tab3:
             user_q = st.text_input("Ask about this stock")
