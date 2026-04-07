@@ -209,7 +209,8 @@ user_profile = {
 # -----------------------
 # Stock Input
 # -----------------------
-ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)")
+ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)", 
+                             value=st.session_state.get("ticker_input", ""))
 ticker = ticker_input.upper().strip() if ticker_input else ""
 
 if "last_ticker" not in st.session_state:
@@ -329,10 +330,11 @@ with tab0:
                 """, unsafe_allow_html=True)
 
                 if st.button(f"Select {ticker_symbol}", key=f"rec_{i}"):
+                    # Instead of st.experimental_rerun(), just set session_state
                     st.session_state.last_ticker = ticker_symbol
                     st.session_state.chat_history = []
-                    st.session_state.active_tab = 1
-                    st.experimental_rerun()
+                    st.session_state.active_tab = 1  # auto switch to Stock Data tab
+                    st.session_state.ticker_input = ticker_symbol
 
 # -----------------------
 # Stock Data Tab
