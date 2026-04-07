@@ -237,7 +237,7 @@ def get_stock_data(ticker):
     except:
         return None, None
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def generate_response(profile, data, ticker):
     prompt = f"""
 You are an AI investment analyst.
@@ -266,6 +266,32 @@ Return ONLY valid JSON:
     except Exception as e:
         return {"error": str(e)}
 
+@st.cache_data(ttl=3600)
+def generate_recommendations(profile):
+    prompt = f"""
+You are an AI investment advisor.
+
+User Profile:
+{profile}
+
+Suggest 5 stocks that match this profile.
+
+Return ONLY valid JSON in this format:
+[
+  {{"ticker": "AAPL", "company": "Apple Inc."}},
+  {{"ticker": "MSFT", "company": "Microsoft Corporation"}}
+]
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        text_response = response.choices[0].message.content.strip()
+        return json.loads(text_response)
+    except Exception as e:
+        return {"error": str(e)}
+
 # -----------------------
 # Main App
 # -----------------------
@@ -275,8 +301,37 @@ if ticker:
     if data is None:
         st.error(f"No valid data found for {ticker}")
     else:
-        tab1, tab2, tab3 = st.tabs(["Stock Data", "AI Analysis", "Chat"])
+        tab0, tab1, tab2, tab3 = st.tabs(["Recommendations", "Stock Data", "AI Analysis", "Chat"])
 
+        # -----------------------
+        # Recommendations Tab
+        # -----------------------
+        with tab0:
+            st.markdown("### 📊 Recommended Stocks For You")
+
+            recs = generate_recommendations(str(user_profile))
+
+            if isinstance(recs, dict) and "error" in recs:
+                st.error(recs["error"])
+            else:
+                cols = st.columns(5)
+
+                for i, stock in enumerate(recs):
+                    ticker_symbol = stock.get("ticker", "N/A")
+                    company_name = stock.get("company", "N/A")
+
+                    with cols[i]:
+                        st.markdown(f"""
+                        <div class="analysis-card">
+                            <div class="analysis-label">{ticker_symbol}</div>
+                            <div class="analysis-value">{company_name}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        if st.button(f"Analyze {ticker_symbol}", key=f"rec_{i}"):
+                            st.session_state.last_ticker = ticker_symbol
+                            st.session_state.chat_history = []
+                            st.experimental_rerun()
         # -----------------------
         # Stock Data Tab
         # -----------------------
