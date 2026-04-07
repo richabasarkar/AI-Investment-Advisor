@@ -193,17 +193,26 @@ sector = st.sidebar.multiselect(
     "Preferred Sectors",
     ["Technology", "Healthcare", "Finance", "Energy", "Consumer Goods"]
 )
+
 investment_type = st.sidebar.selectbox(
     "Investment Type",
-    ["Stocks", "ETFs", "Bonds", "Debt Financing"]
+    ["Stocks", "ETFs", "Bonds", "Debt Financing", "Options"]
 )
+
+option_types = []
+if investment_type == "Options":
+    option_types = st.sidebar.multiselect(
+        "Option Type(s)",
+        ["Call", "Put", "Future", "Other"]
+    )
 
 user_profile = {
     "risk": risk,
     "horizon": horizon,
     "goal": goal,
     "sector": sector,
-    "investment_type": investment_type
+    "investment_type": investment_type,
+    "option_types": option_types
 }
 
 # -----------------------
@@ -250,12 +259,13 @@ def get_stock_data(ticker):
         return None, None
 
 @st.cache_data(ttl=3600)
-def generate_recommendations(risk, horizon, goal, sectors, investment_type):
+def generate_recommendations(risk, horizon, goal, sectors, investment_type, option_types=[]):
     type_instructions = {
         "Stocks": "Recommend individual stocks (equities) only. Use standard stock tickers (e.g. AAPL, MSFT).",
         "ETFs": "Recommend ETFs (Exchange-Traded Funds) only. Use ETF tickers (e.g. VOO, QQQ, ARKK, XLK). Do NOT recommend individual stocks.",
         "Bonds": "Recommend bond ETFs or bond funds only (e.g. BND, TLT, AGG, GOVT, HYG). Do NOT recommend individual stocks or equity ETFs.",
-        "Debt Financing": "Recommend fixed-income instruments and debt-focused funds only, such as corporate bond ETFs, treasury funds, or BDCs (e.g. BND, LQD, BIZD, ARCC). Do NOT recommend equity stocks."
+        "Debt Financing": "Recommend fixed-income instruments and debt-focused funds only, such as corporate bond ETFs, treasury funds, or BDCs (e.g. BND, LQD, BIZD, ARCC). Do NOT recommend equity stocks.",
+        "Options": f"Recommend options based on user preference. Focus on types: {', '.join(option_types) if option_types else 'any option type'}."
     }
 
     sector_note = f"Focus on these sectors: {', '.join(sectors)}." if sectors else "No specific sector preference — diversify across sectors."
@@ -283,6 +293,7 @@ You are an expert financial advisor helping a beginner investor find their first
 
 USER PROFILE:
 - Investment Type: {investment_type}
+- Option Type(s): {', '.join(option_types) if option_types else 'N/A'}
 - Risk Tolerance: {risk} — {risk_guidance.get(risk, '')}
 - Investment Horizon: {horizon} — {horizon_guidance.get(horizon, '')}
 - Investment Goal: {goal} — {goal_guidance.get(goal, '')}
@@ -315,7 +326,6 @@ OUTPUT FORMAT:
   ...
 ]
 """
-
     try:
         response = client.chat.completions.create(
             model="gpt-5-mini",
@@ -343,7 +353,7 @@ with tab0:
     st.markdown("### 📊 Recommended for You")
     st.caption(f"Based on: **{investment_type}** · **{risk} Risk** · **{horizon}-term** · **{goal}**")
 
-    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type)
+    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type, option_types)
 
     if isinstance(recs, dict) and "error" in recs:
         st.error(f"Could not generate recommendations: {recs['error']}")
@@ -419,7 +429,6 @@ with tab2:
         cached_analysis = st.session_state.rec_analysis_cache.get(current_ticker)
 
         if cached_analysis:
-            # Show the pre-computed analysis from the recommendation step
             st.markdown(f"### Analysis for {current_ticker}")
             st.caption("This analysis was generated alongside the recommendation to ensure consistency.")
 
@@ -445,104 +454,28 @@ with tab2:
             """, unsafe_allow_html=True)
 
         else:
-            # Ticker was manually entered, not from recommendations — run fresh analysis
             st.markdown(f"### Analysis for {current_ticker}")
-            st.caption("This ticker was entered manually. Running a fresh analysis.")
-
-            if st.button("Analyze"):
-                data, _ = get_stock_data(current_ticker)
-                if data is None:
-                    st.error("Could not fetch stock data for analysis.")
-                else:
-                    prompt = f"""
-You are an AI investment analyst.
-
-User Profile:
-{user_profile}
-
-Stock Data:
-{data}
-
-Return ONLY valid JSON:
-{{
-  "Recommendation": "Buy / Hold / Avoid",
-  "Reasoning": "...",
-  "Risk Rating": "Low / Medium / High",
-  "Alignment with Goals": "..."
-}}
-"""
-                    try:
-                        response = client.chat.completions.create(
-                            model="gpt-5-mini",
-                            messages=[{"role": "user", "content": prompt}]
-                        )
-                        text_response = response.choices[0].message.content.strip()
-                        analysis = json.loads(text_response)
-                        st.session_state.rec_analysis_cache[current_ticker] = analysis
-
-                        verdict = analysis.get("Recommendation", "Hold")
-                        badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
-                        st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
-                        st.markdown("---")
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-label">Reasoning</div>
-                            <div class="analysis-value">{analysis.get("Reasoning", "N/A")}</div>
-                        </div>
-                        <div class="analysis-card">
-                            <div class="analysis-label">Risk Rating</div>
-                            <div class="analysis-value">{analysis.get("Risk Rating", "N/A")}</div>
-                        </div>
-                        <div class="analysis-card">
-                            <div class="analysis-label">Alignment with Goals</div>
-                            <div class="analysis-value">{analysis.get("Alignment with Goals", "N/A")}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"Error generating analysis: {e}")
+            st.info("Analysis will appear once you generate recommendations.")
 
 # -----------------------
 # Chat Tab
 # -----------------------
 with tab3:
-    if st.session_state.last_ticker:
-        st.markdown("### Ask about this stock")
-        user_q = st.text_input("Type your question here:")
+    st.markdown("### 💬 Ask About This Investment")
+    chat_input = st.text_input("Ask a question about this investment...", key="chat_input")
+    if chat_input and st.session_state.last_ticker:
+        st.session_state.chat_history.append({"role": "user", "content": chat_input})
+        messages = [{"role": "system", "content": "You are a helpful AI financial assistant."}]
+        messages += st.session_state.chat_history
+        try:
+            resp = client.chat.completions.create(model="gpt-5-mini", messages=messages)
+            answer = resp.choices[0].message.content
+            st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        except Exception as e:
+            st.error(f"Error generating response: {e}")
 
-        if st.button("Send Question"):
-            if not user_q:
-                st.warning("Please enter a question first!")
-            else:
-                if "chat_history" not in st.session_state:
-                    st.session_state.chat_history = []
-
-                data, _ = get_stock_data(st.session_state.last_ticker)
-
-                context_prompt = f"""
-You are an AI investment analyst.
-
-User Profile:
-{user_profile}
-
-Stock Ticker: {st.session_state.last_ticker}
-Stock Data:
-{data}
-"""
-
-                chat_messages = [{"role": "system", "content": context_prompt}]
-                for msg in st.session_state.chat_history:
-                    chat_messages.append(msg)
-
-                chat_messages.append({"role": "user", "content": user_q})
-
-                try:
-                    response = client.chat.completions.create(model="gpt-5-mini", messages=chat_messages)
-                    answer = response.choices[0].message.content
-
-                    st.session_state.chat_history.append({"role": "user", "content": user_q})
-                    st.session_state.chat_history.append({"role": "assistant", "content": answer})
-
-                    st.markdown("**AI Response:**")
-                    st.write(answer)
-                except Exception as e:
-                    st.error(f"Error generating response: {e}")
+    for chat in st.session_state.chat_history:
+        if chat["role"] == "user":
+            st.markdown(f"**You:** {chat['content']}")
+        else:
+            st.markdown(f"**AI:** {chat['content']}")
