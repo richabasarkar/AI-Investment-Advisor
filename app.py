@@ -118,7 +118,11 @@ if ticker:
         st.error(f"No valid data found for {ticker}")
     else:
         st.subheader("Stock Data")
-        st.write(data)
+        st.markdown(f"**Price:** {data.get('Price', 'N/A')}")
+        st.markdown(f"**Price to Earnings Ratio:** {data.get('Price to Earnings Ratio', 'N/A')}")
+        st.markdown(f"**Beta:** {data.get('Beta', 'N/A')}")
+        st.markdown(f"**Debt to Equity Ratio:** {data.get('Debt to Equity Ratio', 'N/A')}")
+        st.markdown(f"**Revenue Growth:** {data.get('Revenue Growth', 'N/A')}")
 
         if st.button("Analyze"):
             analysis = generate_response(user_profile, data, ticker)
