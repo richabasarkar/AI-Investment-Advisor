@@ -12,6 +12,7 @@ st.set_page_config(page_title="SharkFIN", page_icon="🦈", layout="wide")
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
     * { font-family: 'Playfair Display', serif !important; }
     .stApp { background-color: #e8e8e8; color: #111111; }
     .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
@@ -31,6 +32,7 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f0f0; border-right: 1px solid #cccccc; }
     hr { border-color: #cccccc; }
     [data-testid="stChatMessage"] { background-color: #f5f5f5; border: 1px solid #cccccc; border-radius: 12px; margin-bottom: 8px; }
+    button[data-testid="collapsedControl"] span { font-family: 'Material Icons' !important; font-size: 24px !important; color: #111111 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -552,7 +554,6 @@ with tab4:
         else:
             st.warning("Could not load peer comparison data.")
 
-        # DCF Section
         st.markdown("---")
         st.markdown("### 🧮 DCF Valuation Model")
         st.caption("A Discounted Cash Flow (DCF) model estimates what a company is *worth today* based on the cash it's expected to generate in the future.")
@@ -565,12 +566,10 @@ with tab4:
         if dcf_cache_key in st.session_state:
             st.markdown("---")
             dcf_text = st.session_state[dcf_cache_key]
-            # Clean up any leftover LaTeX delimiters
             dcf_text = re.sub(r'\\\[', '\n', dcf_text)
             dcf_text = re.sub(r'\\\]', '\n', dcf_text)
             dcf_text = re.sub(r'\\\(', '', dcf_text)
             dcf_text = re.sub(r'\\\)', '', dcf_text)
-            # Render section by section so markdown tables display correctly
             sections = dcf_text.split('\n\n')
             for section in sections:
                 if section.strip():
@@ -618,22 +617,11 @@ with tab5:
         )
         return " ".join(context_parts)
 
-    # Display chat history
-    for chat in st.session_state.chat_history:
-        if chat["role"] == "user":
-            with st.chat_message("user"):
-                st.markdown(chat["content"])
-        elif chat["role"] == "assistant":
-            with st.chat_message("assistant"):
-                st.markdown(chat["content"])
-
-    # Chat input — Enter key works natively with st.chat_input
+    # Chat input at the top — Enter key works natively
     chat_input = st.chat_input("Ask anything about this stock or your portfolio...")
 
     if chat_input:
         st.session_state.chat_history.append({"role": "user", "content": chat_input})
-        with st.chat_message("user"):
-            st.markdown(chat_input)
 
         context = build_chat_context(current_ticker)
         system_prompt = (
@@ -651,26 +639,34 @@ with tab5:
             for m in st.session_state.chat_history
         ]
 
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+        with st.spinner("Thinking..."):
+            try:
+                resp = client.chat.completions.create(
+                    model="gpt-4o-search-preview",
+                    web_search_options={"search_context_size": "high"},
+                    messages=messages,
+                )
+                reply = resp.choices[0].message.content
+            except Exception:
                 try:
                     resp = client.chat.completions.create(
-                        model="gpt-4o-search-preview",
-                        web_search_options={"search_context_size": "high"},
+                        model="gpt-4o-mini",
                         messages=messages,
+                        max_tokens=1000,
+                        temperature=0.7
                     )
                     reply = resp.choices[0].message.content
-                except Exception:
-                    try:
-                        resp = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=messages,
-                            max_tokens=1000,
-                            temperature=0.7
-                        )
-                        reply = resp.choices[0].message.content
-                    except Exception as e:
-                        reply = f"Error: {str(e)}"
-            st.markdown(reply)
+                except Exception as e:
+                    reply = f"Error: {str(e)}"
 
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
+        st.rerun()
+
+    # Display chat history in reverse — newest on top
+    for chat in reversed(st.session_state.chat_history):
+        if chat["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(chat["content"])
+        elif chat["role"] == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(chat["content"])
