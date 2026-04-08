@@ -10,24 +10,24 @@ st.set_page_config(page_title="AI Investment Advisor", page_icon="📈", layout=
 
 st.markdown("""
 <style>
-    .stApp { background-color: #f5f7fb; color: #111111; }
-    .header-banner { background: #ffffff; border: 1px solid #e2e6ef; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; }
-    .header-banner h1 { font-size: 2.4rem; font-weight: 700; color: #111111; }
-    .header-banner p { color: #555; }
-    .analysis-card { background-color: #ffffff; border: 1px solid #e2e6ef; border-radius: 12px; padding: 24px 28px; margin-bottom: 16px; }
-    .analysis-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .analysis-value { font-size: 1rem; color: #222; line-height: 1.6; }
-    .badge-buy { background-color: #e6f4ea; color: #1e7e34; border: 1px solid #1e7e34; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
-    .badge-avoid { background-color: #f8d7da; color: #721c24; border: 1px solid #721c24; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
-    .badge-hold { background-color: #fff3cd; color: #856404; border: 1px solid #856404; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
-    .stTabs [data-baseweb="tab-list"] { display: flex; justify-content: center; gap: 20px; background-color: #ffffff; border-radius: 14px; padding: 10px; border: 1px solid #e2e6ef; margin-bottom: 20px; }
-    .stTabs [data-baseweb="tab"] { background-color: #f1f3f8; color: #444; border-radius: 10px; padding: 10px 24px; font-weight: 600; transition: all 0.2s ease; }
-    .stTabs [data-baseweb="tab"]:hover { background-color: #e4e8f2; color: #000; }
-    .stTabs [aria-selected="true"] { background-color: #dfe6f3 !important; color: #000 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-    .stTextInput > div > div > input { background-color: #ffffff; border: 1px solid #ccc; color: #111111; border-radius: 10px; padding: 12px 16px; font-size: 1rem; }
-    [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e2e6ef; }
-    hr { border-color: #e2e6ef; }
-    [data-testid="stChatMessage"] { background-color: #ffffff; border: 1px solid #e2e6ef; border-radius: 12px; margin-bottom: 8px; }
+    .stApp { background-color: #0d1117; color: #e6edf3; }
+    .header-banner { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
+    .header-banner h1 { font-size: 2.4rem; font-weight: 700; color: #58a6ff; letter-spacing: 2px; }
+    .header-banner p { color: #8b949e; }
+    .analysis-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px 28px; margin-bottom: 16px; }
+    .analysis-label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .analysis-value { font-size: 1rem; color: #e6edf3; line-height: 1.6; }
+    .badge-buy { background-color: #0d4429; color: #3fb950; border: 1px solid #3fb950; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
+    .badge-avoid { background-color: #3d1217; color: #f85149; border: 1px solid #f85149; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
+    .badge-hold { background-color: #2d2a00; color: #e3b341; border: 1px solid #e3b341; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
+    .stTabs [data-baseweb="tab-list"] { display: flex; justify-content: center; gap: 28px; background-color: #161b22; border-radius: 0px; padding: 10px; border: 1px solid #30363d; margin-bottom: 20px; }
+    .stTabs [data-baseweb="tab"] { background-color: #21262d; color: #8b949e; border-radius: 0px; padding: 10px 28px; font-weight: 700; transition: all 0.2s ease; }
+    .stTabs [data-baseweb="tab"]:hover { background-color: #30363d; color: #e6edf3; }
+    .stTabs [aria-selected="true"] { background-color: #1f6feb !important; color: #ffffff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+    .stTextInput > div > div > input { background-color: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 10px; padding: 12px 16px; font-size: 1rem; }
+    [data-testid="stSidebar"] { background-color: #161b22; border-right: 1px solid #30363d; }
+    hr { border-color: #30363d; }
+    [data-testid="stChatMessage"] { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -35,7 +35,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.markdown("""
 <div class="header-banner">
-    <h1>📈 AI Investment Advisor</h1>
+    <h1>🦈 SharkFIN</h1>
     <p>Enter a stock ticker to get real-time data, AI-powered analysis, and personalized insights based on your investment profile.</p>
 </div>
 """, unsafe_allow_html=True)
