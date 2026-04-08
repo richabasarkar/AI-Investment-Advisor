@@ -383,6 +383,47 @@ OUTPUT FORMAT:
     except Exception as e:
         return {"error": str(e)}
 
+@st.cache_data(ttl=3600)
+def generate_single_analysis(ticker, risk, horizon, goal, sectors, investment_type, option_types=[]):
+    """Generate an AI analysis for a manually entered ticker using the user's profile."""
+    sector_note = f"Focus on these sectors: {', '.join(sectors)}." if sectors else "No specific sector preference."
+
+    prompt = f"""
+You are an expert financial advisor. A user has manually entered the ticker "{ticker}" and wants an analysis based on their investment profile.
+
+USER PROFILE:
+- Risk Tolerance: {risk}
+- Investment Horizon: {horizon}
+- Investment Goal: {goal}
+- Investment Type: {investment_type}
+- Option Type(s): {', '.join(option_types) if option_types else 'N/A'}
+- Sector Preference: {sector_note}
+
+Analyse "{ticker}" against this profile and return ONLY a valid JSON object — no markdown, no preamble.
+
+OUTPUT FORMAT:
+{{
+  "Recommendation": "Buy" or "Hold" or "Avoid",
+  "Reasoning": "Detailed reasoning tied to the user profile.",
+  "Risk Rating": "Low" or "Medium" or "High",
+  "Alignment with Goals": "Explanation of how this aligns (or doesn't) with the user's goal."
+}}
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        text_response = response.choices[0].message.content.strip()
+        if text_response.startswith("```"):
+            text_response = text_response.split("```")[1]
+            if text_response.startswith("json"):
+                text_response = text_response[4:]
+        return json.loads(text_response.strip())
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # -----------------------
 # Tabs
 # -----------------------
@@ -510,7 +551,40 @@ with tab2:
 
         else:
             st.markdown(f"### Analysis for {current_ticker}")
-            st.info("Analysis will appear once you generate recommendations.")
+            st.caption("Generating analysis based on your investment profile...")
+
+            with st.spinner(f"Analysing {current_ticker}..."):
+                generated = generate_single_analysis(
+                    current_ticker, risk, horizon, goal,
+                    tuple(sector), investment_type, option_types
+                )
+
+            if isinstance(generated, dict) and "error" in generated:
+                st.error(f"Could not generate analysis: {generated['error']}")
+            else:
+                # Cache it so Chat tab and subsequent views can use it
+                st.session_state.rec_analysis_cache[current_ticker] = generated
+
+                verdict = generated.get("Recommendation", "Hold")
+                badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
+
+                st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
+                st.markdown("---")
+
+                st.markdown(f"""
+                <div class="analysis-card">
+                    <div class="analysis-label">Reasoning</div>
+                    <div class="analysis-value">{generated.get("Reasoning", "N/A")}</div>
+                </div>
+                <div class="analysis-card">
+                    <div class="analysis-label">Risk Rating</div>
+                    <div class="analysis-value">{generated.get("Risk Rating", "N/A")}</div>
+                </div>
+                <div class="analysis-card">
+                    <div class="analysis-label">Alignment with Goals</div>
+                    <div class="analysis-value">{generated.get("Alignment with Goals", "N/A")}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # -----------------------
 # Chat Tab
