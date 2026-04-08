@@ -10,6 +10,15 @@ st.set_page_config(page_title="AI Investment Advisor", page_icon="📈", layout=
 
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
+    * { font-family: 'Playfair Display', serif !important; }
+    .stApp { background-color: #e8e8e8; color: #111111; }
+    ... rest of your existing styles unchanged ...
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
     .stApp { background-color: #e8e8e8; color: #111111; }
     .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
     .header-banner h1 { font-size: 5rem; font-weight: 900; color: #111111; letter-spacing: 4px; }
@@ -35,7 +44,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.markdown("""
 <div class="header-banner">
-    <h1>🦈 SharkFIN</h1>
+    <h1>🦈SharkFIN</h1>
     <p>Enter a stock ticker to get real-time data, AI-powered analysis, and personalized insights based on your investment profile.</p>
 </div>
 """, unsafe_allow_html=True)
