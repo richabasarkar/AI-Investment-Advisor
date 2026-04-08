@@ -265,7 +265,7 @@ Be thorough, use plain language throughout, and aim for 600–900 words total.""
             messages=[{"role": "user", "content": prompt}],
             tools=[{"type": "web_search_preview"}],
             tool_choice="auto",
-            max_tokens=1500
+            max_completion_tokens=1500
         )
         full_text = ""
         for block in response.output:
@@ -282,7 +282,7 @@ Be thorough, use plain language throughout, and aim for 600–900 words total.""
             response = client.chat.completions.create(
                 model="gpt-5-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=1500
+                max_completion_tokens=1500
             )
             return response.choices[0].message.content.strip()
         except Exception as e2:
@@ -325,7 +325,7 @@ Use real data where possible. Clearly flag any estimates. Write in plain English
             messages=[{"role": "user", "content": prompt}],
             tools=[{"type": "web_search_preview"}],
             tool_choice="auto",
-            max_tokens=2000
+            max_completion_tokens=2000
         )
         full_text = ""
         for block in response.output:
@@ -341,7 +341,7 @@ Use real data where possible. Clearly flag any estimates. Write in plain English
             response = client.chat.completions.create(
                 model="gpt-5-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000
+                max_completion_tokens=2000
             )
             return response.choices[0].message.content.strip()
         except Exception as e2:
@@ -475,8 +475,8 @@ with tab3:
             st.markdown("---")
             st.markdown("#### 🔗 Find Official Reports")
             st.markdown(
-                f"- [SEC Filings (EDGAR)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company={current_ticker}&type=10-K&dateb=&owner=include&count=10) — Annual (10-K) and Quarterly (10-Q) reports\n"
-                f"- [Macrotrends Financials](https://www.macrotrends.net/stocks/charts/{current_ticker}/financials) — Income statement, balance sheet, cash flow\n"
+                f"- [SEC Filings (EDGAR)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={current_ticker}&type=10-K&dateb=&owner=include&count=10) — Annual (10-K) and Quarterly (10-Q) reports\n"
+                f"- [Macrotrends Financials](https://www.macrotrends.net/stocks/research?search={current_ticker}) — Income statement, balance sheet, cash flow\n"
                 f"- [Yahoo Finance](https://finance.yahoo.com/quote/{current_ticker}/financials/) — Earnings and financials\n"
                 f"- [Seeking Alpha](https://seekingalpha.com/symbol/{current_ticker}/earnings) — Earnings coverage and analysis"
             )
@@ -636,7 +636,7 @@ with tab5:
         messages = [{"role": "system", "content": system_prompt}] + st.session_state.chat_history
         with st.spinner("🤔 AI is thinking..."):
             try:
-                resp = client.chat.completions.create(model="gpt-5-mini", messages=messages, max_tokens=1000, temperature=0.7)
+                resp = client.chat.completions.create(model="gpt-5-mini", messages=messages, max_completion_tokens=1000, temperature=0.7)
                 st.session_state.chat_history.append({"role": "assistant", "content": resp.choices[0].message.content})
             except Exception as e:
                 st.error(f"Error generating response: {e}")
