@@ -10,24 +10,24 @@ st.set_page_config(page_title="AI Investment Advisor", page_icon="📈", layout=
 
 st.markdown("""
 <style>
-    .stApp { background-color: #1e1e1e; color: #f0f0f0; }
-    .header-banner { background: #2a2a2a; border: 1px solid #3d3d3d; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
-    .header-banner h1 { font-size: 3.2rem; font-weight: 800; color: #f0f0f0; letter-spacing: 3px; }
-    .header-banner p { color: #aaaaaa; }
-    .analysis-card { background-color: #2a2a2a; border: 1px solid #3d3d3d; border-radius: 12px; padding: 24px 28px; margin-bottom: 16px; }
-    .analysis-label { font-size: 0.75rem; color: #aaaaaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .analysis-value { font-size: 1rem; color: #f0f0f0; line-height: 1.6; }
+    .stApp { background-color: #e8e8e8; color: #111111; }
+    .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
+    .header-banner h1 { font-size: 5rem; font-weight: 900; color: #111111; letter-spacing: 4px; }
+    .header-banner p { color: #444444; }
+    .analysis-card { background-color: #f5f5f5; border: 1px solid #cccccc; border-radius: 12px; padding: 24px 28px; margin-bottom: 16px; }
+    .analysis-label { font-size: 0.75rem; color: #555555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .analysis-value { font-size: 1rem; color: #111111; line-height: 1.6; }
     .badge-buy { background-color: #0d4429; color: #3fb950; border: 1px solid #3fb950; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
     .badge-avoid { background-color: #3d1217; color: #f85149; border: 1px solid #f85149; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
     .badge-hold { background-color: #2d2a00; color: #e3b341; border: 1px solid #e3b341; border-radius: 8px; padding: 6px 16px; font-weight: 700; font-size: 1.1rem; }
-    .stTabs [data-baseweb="tab-list"] { display: flex; justify-content: center; gap: 28px; background-color: #2a2a2a; border-radius: 0px; padding: 10px; border: 1px solid #3d3d3d; margin-bottom: 20px; }
-    .stTabs [data-baseweb="tab"] { background-color: #333333; color: #aaaaaa; border-radius: 0px; padding: 10px 28px; font-weight: 700; transition: all 0.2s ease; }
-    .stTabs [data-baseweb="tab"]:hover { background-color: #3d3d3d; color: #f0f0f0; }
-    .stTabs [aria-selected="true"] { background-color: #555555 !important; color: #ffffff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
-    .stTextInput > div > div > input { background-color: #2a2a2a; border: 1px solid #3d3d3d; color: #f0f0f0; border-radius: 10px; padding: 12px 16px; font-size: 1rem; }
-    [data-testid="stSidebar"] { background-color: #242424; border-right: 1px solid #3d3d3d; }
-    hr { border-color: #3d3d3d; }
-    [data-testid="stChatMessage"] { background-color: #2a2a2a; border: 1px solid #3d3d3d; border-radius: 12px; margin-bottom: 8px; }
+    .stTabs [data-baseweb="tab-list"] { display: flex; justify-content: center; gap: 28px; background-color: #f5f5f5; border-radius: 0px; padding: 10px; border: 1px solid #cccccc; margin-bottom: 20px; }
+    .stTabs [data-baseweb="tab"] { background-color: #e0e0e0; color: #111111; border-radius: 0px; padding: 10px 28px; font-weight: 700; transition: all 0.2s ease; }
+    .stTabs [data-baseweb="tab"]:hover { background-color: #cccccc; color: #000000; }
+    .stTabs [aria-selected="true"] { background-color: #111111 !important; color: #ffffff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .stTextInput > div > div > input { background-color: #f5f5f5; border: 1px solid #cccccc; color: #111111; border-radius: 10px; padding: 12px 16px; font-size: 1rem; }
+    [data-testid="stSidebar"] { background-color: #f0f0f0; border-right: 1px solid #cccccc; }
+    hr { border-color: #cccccc; }
+    [data-testid="stChatMessage"] { background-color: #f5f5f5; border: 1px solid #cccccc; border-radius: 12px; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
