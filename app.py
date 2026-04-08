@@ -218,8 +218,16 @@ user_profile = {
 # -----------------------
 # Stock Input
 # -----------------------
-ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)",
-                             value=st.session_state.get("ticker_input", ""))
+ticker_col, btn_col = st.columns([5, 1])
+with ticker_col:
+    ticker_input = st.text_input("🔍 Enter a stock ticker (e.g., AAPL, TSLA, MSFT)",
+                                 value=st.session_state.get("ticker_input", ""),
+                                 label_visibility="visible")
+with btn_col:
+    st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
+    analyse_clicked = st.button("Analyse", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
 ticker = ticker_input.upper().strip() if ticker_input else ""
 
 if "last_ticker" not in st.session_state:
@@ -228,7 +236,8 @@ if "last_ticker" not in st.session_state:
     st.session_state.active_tab = 0
     st.session_state.rec_analysis_cache = {}
 else:
-    if ticker and ticker != st.session_state.last_ticker:
+    # Trigger on button click OR on enter (ticker changed)
+    if ticker and (analyse_clicked or ticker != st.session_state.last_ticker):
         st.session_state.last_ticker = ticker
         st.session_state.chat_history = []
         st.session_state.active_tab = 0
@@ -524,6 +533,11 @@ with tab2:
         current_ticker = st.session_state.last_ticker
         cached_analysis = st.session_state.rec_analysis_cache.get(current_ticker)
 
+        refresh_analysis = st.button("🔄 Refresh Analysis", key="refresh_analysis_btn")
+        if refresh_analysis and current_ticker in st.session_state.rec_analysis_cache:
+            del st.session_state.rec_analysis_cache[current_ticker]
+            cached_analysis = None
+
         if cached_analysis:
             st.markdown(f"### Analysis for {current_ticker}")
             st.caption("This analysis was generated alongside the recommendation to ensure consistency.")
@@ -551,40 +565,19 @@ with tab2:
 
         else:
             st.markdown(f"### Analysis for {current_ticker}")
-            st.caption("Generating analysis based on your investment profile...")
-
-            with st.spinner(f"Analysing {current_ticker}..."):
-                generated = generate_single_analysis(
-                    current_ticker, risk, horizon, goal,
-                    tuple(sector), investment_type, option_types
-                )
-
-            if isinstance(generated, dict) and "error" in generated:
-                st.error(f"Could not generate analysis: {generated['error']}")
-            else:
-                # Cache it so Chat tab and subsequent views can use it
-                st.session_state.rec_analysis_cache[current_ticker] = generated
-
-                verdict = generated.get("Recommendation", "Hold")
-                badge_class = {"Buy": "badge-buy", "Hold": "badge-hold", "Avoid": "badge-avoid"}.get(verdict, "badge-hold")
-
-                st.markdown(f'<span class="{badge_class}">{verdict}</span>', unsafe_allow_html=True)
-                st.markdown("---")
-
-                st.markdown(f"""
-                <div class="analysis-card">
-                    <div class="analysis-label">Reasoning</div>
-                    <div class="analysis-value">{generated.get("Reasoning", "N/A")}</div>
-                </div>
-                <div class="analysis-card">
-                    <div class="analysis-label">Risk Rating</div>
-                    <div class="analysis-value">{generated.get("Risk Rating", "N/A")}</div>
-                </div>
-                <div class="analysis-card">
-                    <div class="analysis-label">Alignment with Goals</div>
-                    <div class="analysis-value">{generated.get("Alignment with Goals", "N/A")}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            run_analysis = st.button("🧠 Generate Analysis", key="generate_analysis_btn")
+            if run_analysis:
+                st.caption("Generating analysis based on your investment profile...")
+                with st.spinner(f"Analysing {current_ticker}..."):
+                    generated = generate_single_analysis(
+                        current_ticker, risk, horizon, goal,
+                        tuple(sector), investment_type, option_types
+                    )
+                if isinstance(generated, dict) and "error" in generated:
+                    st.error(f"Could not generate analysis: {generated['error']}")
+                else:
+                    st.session_state.rec_analysis_cache[current_ticker] = generated
+                    st.rerun()
 
 # -----------------------
 # Chat Tab
@@ -630,9 +623,16 @@ with tab3:
 
         return " ".join(context_parts)
 
-    chat_input = st.text_input("Ask a question about this investment...", key="chat_input")
+    chat_col, send_col = st.columns([5, 1])
+    with chat_col:
+        chat_input = st.text_input("Ask a question about this investment...", key="chat_input")
+    with send_col:
+        st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
+        send_clicked = st.button("Send", use_container_width=True, key="chat_send_btn")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    if chat_input:
+    if (chat_input and send_clicked) or (chat_input and chat_input != st.session_state.get("last_chat_input", "")):
+        st.session_state.last_chat_input = chat_input
         st.session_state.chat_history.append({"role": "user", "content": chat_input})
 
         context = build_chat_context(current_ticker)
