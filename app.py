@@ -582,6 +582,9 @@ with tab2:
 # -----------------------
 # Chat Tab
 # -----------------------
+# -----------------------
+# Chat Tab
+# -----------------------
 with tab3:
     st.markdown("### 💬 Ask About This Investment")
 
@@ -631,29 +634,47 @@ with tab3:
         send_clicked = st.button("Send", use_container_width=True, key="chat_send_btn")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if (chat_input and send_clicked) or (chat_input and chat_input != st.session_state.get("last_chat_input", "")):
-        st.session_state.last_chat_input = chat_input
+    # FIX 1: Only trigger on button click — eliminates the double-message bug
+    if send_clicked and chat_input:
         st.session_state.chat_history.append({"role": "user", "content": chat_input})
 
         context = build_chat_context(current_ticker)
 
+        # FIX 3: Richer, more thorough system prompt
         system_prompt = (
-            "You are a helpful AI financial assistant. "
-            "Answer questions using the context below — prioritise this data over general knowledge when relevant. "
-            "Be concise, clear, and helpful.\n\n"
+            "You are an expert AI financial analyst and investment advisor with deep knowledge of "
+            "equity markets, macroeconomics, company fundamentals, and investment strategy. "
+            "Your role is to give thorough, insightful, and well-structured answers — similar to "
+            "consulting a senior financial analyst. Draw on the context provided (live stock data, "
+            "AI analysis, user profile) AND your broader knowledge of the company, its sector, "
+            "competitive landscape, recent news, earnings history, analyst sentiment, and any other "
+            "relevant publicly available information. "
+            "Structure your responses clearly. Use bullet points or numbered lists where appropriate. "
+            "Be honest about risks and uncertainties. Tailor your answer to the user's investment "
+            "profile where relevant. Do not give overly brief or vague answers — the user wants a real, thorough insight.\n\n"
             f"CONTEXT:\n{context}"
         )
 
         messages = [{"role": "system", "content": system_prompt}]
         messages += st.session_state.chat_history
 
-        try:
-            resp = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
-            answer = resp.choices[0].message.content
-            st.session_state.chat_history.append({"role": "assistant", "content": answer})
-        except Exception as e:
-            st.error(f"Error generating response: {e}")
+        # FIX 2: Show a loading spinner while waiting for the response
+        with st.spinner("🤔 AI is thinking..."):
+            try:
+                resp = client.chat.completions.create(
+                    model="gpt-4o",  # Upgraded from gpt-4o-mini for richer responses
+                    messages=messages,
+                    max_tokens=1000,
+                    temperature=0.7,
+                )
+                answer = resp.choices[0].message.content
+                st.session_state.chat_history.append({"role": "assistant", "content": answer})
+            except Exception as e:
+                st.error(f"Error generating response: {e}")
 
+        st.rerun()
+
+    # Display chat history
     for chat in st.session_state.chat_history:
         if chat["role"] == "user":
             st.markdown(f"**You:** {chat['content']}")
