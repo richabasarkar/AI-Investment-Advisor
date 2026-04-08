@@ -233,32 +233,35 @@ def generate_news_report(ticker):
     """Comprehensive news report using GPT-5-mini with web search."""
     prompt = f"""You are a financial journalist writing for a general audience — assume the reader has NO finance background.
 
-Research and write a comprehensive report for stock ticker: {ticker}
+Use your web search capability to find the latest news, filings, and financial data for stock ticker: {ticker}
 
-Use these clearly labelled sections:
+Write a comprehensive report using these clearly labelled sections:
+
+**Quick Summary**
+In 3-5 bullet points, give the most important things to know about this company right now. Keep it very plain and simple.
 
 **1. Company Overview**
 What does this company do in plain English? What products/services do they sell and who are their customers?
 
-**2. Recent News**
-What are the most important news stories about this company in the last 1–3 months? Explain why each story matters to investors.
+**2. Recent News (Last 1-3 Months)**
+Search for and summarise the most important recent news stories. For each story, explain in simple terms why it matters to someone who owns or is considering buying this stock.
 
 **3. Latest Earnings Report**
-What were the most recent quarterly results? Did they beat or miss expectations? Use simple language (e.g. "they made more money than Wall Street expected"). Include key numbers: revenue, profit, EPS.
+Search for the most recent quarterly earnings. Did they beat or miss expectations? Use simple language. Include key numbers: revenue, profit, EPS. Explain what these numbers mean for ordinary investors.
 
-**4. Industry Health**
+**4. SEC Filings and Financial Trends**
+Summarise any notable recent SEC filings (10-K, 10-Q, 8-K). What do the financial trends show — is revenue growing, are profits improving, is debt increasing? Explain in simple terms what these trends mean.
+
+**5. Industry Health**
 How is the broader industry doing? Is the sector growing, struggling, or facing headwinds? What macro trends are relevant?
 
-**5. Analyst Sentiment**
+**6. Analyst Sentiment**
 What are analysts saying? What is the general consensus (buy/hold/sell)? Any notable price target changes?
 
-**6. Key Risks**
-What are the 3–4 biggest risks to this stock right now, explained in plain English?
+**7. Key Risks**
+What are the 3-4 biggest risks to this stock right now, explained in plain English?
 
-**7. Where to Find Official Reports**
-Provide the investor relations URL and link to SEC filings if known.
-
-Be thorough, use plain language throughout, and aim for 600–900 words total."""
+Be thorough, use plain language throughout, and aim for 700-1000 words total. Always search for the latest available data before writing."""
     try:
         response = client.chat.completions.create(
             model="gpt-5-mini",
@@ -293,32 +296,36 @@ def generate_dcf(ticker):
     """Full DCF model using GPT-5-mini with web search."""
     prompt = f"""You are a financial analyst building a Discounted Cash Flow (DCF) valuation for {ticker}.
 
-Use publicly available data — most recent annual report, 10-K, earnings releases, and investor relations filings.
+CRITICAL INSTRUCTIONS:
+- Use your web search tool NOW to find the most recent 10-K, earnings releases, and investor relations data for {ticker}.
+- Do NOT ask the user for any input or present multiple options. Always proceed immediately and complete the full DCF model yourself in one response.
+- If some data points are uncertain or estimated, clearly label them as [Estimated] but still provide a number and keep going.
+- Never stop mid-analysis to ask a question. Complete the entire model from start to finish.
 
 Structure your report with these sections:
 
-**1. Historical Financials (last 3 years)**
-Summarise revenue, operating income, free cash flow, and capex. Use real numbers where available.
+**1. Historical Financials (Last 3 Years)**
+Search for and summarise real revenue, operating income, free cash flow, and capex figures for the last 3 fiscal years. Label any estimated numbers as [Estimated].
 
 **2. DCF Assumptions**
-State and justify: revenue growth rate (years 1–5 and terminal), EBIT margin, tax rate, D&A, capex, working capital changes, WACC (explain this simply), terminal growth rate.
+State and justify all assumptions: revenue growth rate (years 1-5 and terminal), EBIT margin, tax rate, D&A, capex, working capital changes, WACC (explain what this means in one simple sentence), terminal growth rate.
 
-**3. Projected Free Cash Flows (5 years)**
-Show year-by-year projected FCF in a table.
+**3. Projected Free Cash Flows (5 Years)**
+Show a year-by-year table of projected free cash flow based on your assumptions.
 
 **4. Terminal Value**
-Calculate terminal value using the Gordon Growth Model. Explain it in plain English.
+Calculate terminal value using the Gordon Growth Model. Explain in one sentence what this means for a non-finance reader.
 
 **5. DCF Valuation**
-Sum of PV of FCFs + PV of Terminal Value = Enterprise Value. Adjust for net debt → Equity Value. Divide by shares outstanding = Implied Share Price.
+Sum of PV of FCFs + PV of Terminal Value = Enterprise Value. Subtract net debt to get Equity Value. Divide by diluted shares outstanding = Implied Share Price. Show every step clearly.
 
 **6. Sensitivity Analysis**
-Table of implied share price under different WACC and terminal growth rate combinations.
+Show a simple table of implied share prices under different combinations of WACC and terminal growth rate.
 
 **7. Verdict**
-Compare DCF implied price to current market price. Is the stock undervalued, fairly valued, or overvalued?
+Compare the DCF implied price to the current market price. Is the stock undervalued, fairly valued, or overvalued? Explain simply in 2-3 sentences.
 
-Use real data where possible. Clearly flag any estimates. Write in plain English throughout."""
+Write everything in plain English so a non-finance reader can follow along. Complete the full analysis without asking any questions."""
     try:
         response = client.chat.completions.create(
             model="gpt-5-mini",
