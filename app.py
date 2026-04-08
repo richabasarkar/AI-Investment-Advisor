@@ -3,22 +3,16 @@ import yfinance as yf
 from openai import OpenAI
 import os
 import json
+import re
 import plotly.graph_objects as go
 import pandas as pd
 
-st.set_page_config(page_title="AI Investment Advisor", page_icon="📈", layout="wide")
+st.set_page_config(page_title="SharkFIN", page_icon="🦈", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
     * { font-family: 'Playfair Display', serif !important; }
-    .stApp { background-color: #e8e8e8; color: #111111; }
-    ... rest of your existing styles unchanged ...
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
     .stApp { background-color: #e8e8e8; color: #111111; }
     .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
     .header-banner h1 { font-size: 5rem; font-weight: 900; color: #111111; letter-spacing: 4px; }
@@ -44,7 +38,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.markdown("""
 <div class="header-banner">
-    <h1>SharkFIN</h1>
+    <h1>🦈 SharkFIN</h1>
     <p>Enter a stock ticker to get real-time data, AI-powered analysis, and personalized insights based on your investment profile.</p>
 </div>
 """, unsafe_allow_html=True)
@@ -63,7 +57,7 @@ if investment_type == "Options":
     option_types = st.sidebar.multiselect("Option Type(s)", ["Call", "Put", "Future", "Other"])
 
 # -----------------------
-# Ticker input — Enter key supported via st.form
+# Ticker input
 # -----------------------
 with st.form(key="ticker_form"):
     ticker_col, btn_col = st.columns([5, 1])
@@ -162,7 +156,7 @@ def get_extended_fundamentals(ticker):
 def get_competitors(ticker):
     try:
         resp = client.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": (
                 f"List the 4 most direct publicly traded competitors of {ticker} (stock ticker). "
                 "Return ONLY a JSON array of ticker symbols, e.g. [\"AAPL\",\"MSFT\"]. No explanation, no markdown."
@@ -206,7 +200,7 @@ STRICT RULES:
 FORMAT:
 [{{"ticker":"X","company":"Full Name","reason":"One sentence.","recommendation":"Buy","reasoning":"Detail.","risk_rating":"Low","alignment":"Goal alignment."}}]"""
     try:
-        response = client.chat.completions.create(model="gpt-5-mini", messages=[{"role": "user", "content": prompt}])
+        response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
         text_response = response.choices[0].message.content.strip()
         if text_response.startswith("```"):
             text_response = text_response.split("```")[1]
@@ -228,7 +222,7 @@ USER PROFILE:
 Return ONLY a valid JSON object, no markdown.
 FORMAT: {{"Recommendation":"Buy/Hold/Avoid","Reasoning":"Detail.","Risk Rating":"Low/Medium/High","Alignment with Goals":"Detail."}}"""
     try:
-        response = client.chat.completions.create(model="gpt-5-mini", messages=[{"role": "user", "content": prompt}])
+        response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
         text_response = response.choices[0].message.content.strip()
         if text_response.startswith("```"):
             text_response = text_response.split("```")[1]
@@ -239,7 +233,6 @@ FORMAT: {{"Recommendation":"Buy/Hold/Avoid","Reasoning":"Detail.","Risk Rating":
 
 
 def generate_news_report(ticker):
-    """Comprehensive news report using GPT-5-mini with web search."""
     prompt = f"""You are a financial journalist writing for a general audience — assume the reader has NO finance background.
 
 Use your web search capability to find the latest news, filings, and financial data for stock ticker: {ticker}
@@ -247,45 +240,43 @@ Use your web search capability to find the latest news, filings, and financial d
 Write a comprehensive report using these clearly labelled sections:
 
 **Quick Summary**
-In 3-5 bullet points, give the most important things to know about this company right now. Keep it very plain and simple.
+In 3-5 bullet points, give the most important things to know about this company right now.
 
 **1. Company Overview**
-What does this company do in plain English? What products/services do they sell and who are their customers?
+What does this company do in plain English?
 
 **2. Recent News (Last 1-3 Months)**
-Search for and summarise the most important recent news stories. For each story, explain in simple terms why it matters to someone who owns or is considering buying this stock.
+Search for and summarise the most important recent news stories. Explain why each matters to investors.
 
 **3. Latest Earnings Report**
-Search for the most recent quarterly earnings. Did they beat or miss expectations? Use simple language. Include key numbers: revenue, profit, EPS. Explain what these numbers mean for ordinary investors.
+Most recent quarterly earnings. Beat or miss? Include revenue, profit, EPS in simple terms.
 
 **4. SEC Filings and Financial Trends**
-Summarise any notable recent SEC filings (10-K, 10-Q, 8-K). What do the financial trends show — is revenue growing, are profits improving, is debt increasing? Explain in simple terms what these trends mean.
+Notable recent SEC filings and what the financial trends show.
 
 **5. Industry Health**
-How is the broader industry doing? Is the sector growing, struggling, or facing headwinds? What macro trends are relevant?
+How is the broader industry doing? Relevant macro trends?
 
 **6. Analyst Sentiment**
-What are analysts saying? What is the general consensus (buy/hold/sell)? Any notable price target changes?
+What are analysts saying? General consensus and any notable price target changes.
 
 **7. Key Risks**
-What are the 3-4 biggest risks to this stock right now, explained in plain English?
+The 3-4 biggest risks to this stock right now, in plain English.
 
-Be thorough, use plain language throughout, and aim for 700-1000 words total. Always search for the latest available data before writing."""
+Be thorough, use plain language, aim for 700-1000 words. Always search for the latest data before writing."""
     try:
-        # Use gpt-4o-search-preview with web_search_options for live web access
         response = client.chat.completions.create(
             model="gpt-4o-search-preview",
             web_search_options={"search_context_size": "high"},
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
-    except Exception as e:
-        # Fallback: gpt-5-mini without live search
+    except Exception:
         try:
             response = client.chat.completions.create(
-                model="gpt-5-mini",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=1500
+                max_tokens=1500
             )
             return response.choices[0].message.content.strip()
         except Exception as e2:
@@ -293,54 +284,53 @@ Be thorough, use plain language throughout, and aim for 700-1000 words total. Al
 
 
 def generate_dcf(ticker):
-    """Full DCF model using GPT-5-mini with web search."""
     prompt = f"""You are a financial analyst building a Discounted Cash Flow (DCF) valuation for {ticker}.
 
 CRITICAL INSTRUCTIONS:
-- Use your web search tool NOW to find the most recent 10-K, earnings releases, and investor relations data for {ticker}.
-- Do NOT ask the user for any input or present multiple options. Always proceed immediately and complete the full DCF model yourself in one response.
-- If some data points are uncertain or estimated, clearly label them as [Estimated] but still provide a number and keep going.
-- Never stop mid-analysis to ask a question. Complete the entire model from start to finish.
+- Use your web search tool to find the most recent 10-K, earnings releases, and investor relations data for {ticker}.
+- Do NOT ask the user for any input. Complete the full DCF model in one response.
+- Label uncertain estimates as [Estimated] but always provide a number and keep going.
+- Format all tables as proper markdown tables with | separators and header rows.
+- Do NOT use LaTeX for formulas — write them out in plain text instead (e.g. TV = FCF x (1+g) / (WACC - g)).
+- Separate every section with a blank line.
 
 Structure your report with these sections:
 
 **1. Historical Financials (Last 3 Years)**
-Search for and summarise real revenue, operating income, free cash flow, and capex figures for the last 3 fiscal years. Label any estimated numbers as [Estimated].
+Real revenue, operating income, free cash flow, and capex for the last 3 fiscal years in a markdown table.
 
 **2. DCF Assumptions**
-State and justify all assumptions: revenue growth rate (years 1-5 and terminal), EBIT margin, tax rate, D&A, capex, working capital changes, WACC (explain what this means in one simple sentence), terminal growth rate.
+All assumptions: revenue growth rate (years 1-5 and terminal), EBIT margin, tax rate, D&A, capex, working capital changes, WACC, terminal growth rate.
 
 **3. Projected Free Cash Flows (5 Years)**
-Show a year-by-year table of projected free cash flow based on your assumptions.
+Year-by-year table of projected free cash flow.
 
 **4. Terminal Value**
-Calculate terminal value using the Gordon Growth Model. Explain in one sentence what this means for a non-finance reader.
+Calculate using Gordon Growth Model in plain text. One sentence explaining what this means.
 
 **5. DCF Valuation**
-Sum of PV of FCFs + PV of Terminal Value = Enterprise Value. Subtract net debt to get Equity Value. Divide by diluted shares outstanding = Implied Share Price. Show every step clearly.
+PV of FCFs + PV of Terminal Value = Enterprise Value. Subtract net debt = Equity Value. Divide by shares = Implied Share Price. Show every step.
 
 **6. Sensitivity Analysis**
-Show a simple table of implied share prices under different combinations of WACC and terminal growth rate.
+Markdown table of implied share prices under different WACC and terminal growth rate combinations.
 
 **7. Verdict**
-Compare the DCF implied price to the current market price. Is the stock undervalued, fairly valued, or overvalued? Explain simply in 2-3 sentences.
+Compare DCF implied price to current market price. Undervalued, fairly valued, or overvalued? 2-3 plain English sentences.
 
-Write everything in plain English so a non-finance reader can follow along. Complete the full analysis without asking any questions."""
+Write everything in plain English. Complete the full analysis without asking any questions."""
     try:
-        # Use gpt-4o-search-preview with web_search_options for live web access
         response = client.chat.completions.create(
             model="gpt-4o-search-preview",
             web_search_options={"search_context_size": "high"},
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
-    except Exception as e:
-        # Fallback: gpt-5-mini without live search
+    except Exception:
         try:
             response = client.chat.completions.create(
-                model="gpt-5-mini",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=2000
+                max_tokens=2000
             )
             return response.choices[0].message.content.strip()
         except Exception as e2:
@@ -348,7 +338,7 @@ Write everything in plain English so a non-finance reader can follow along. Comp
 
 
 # -----------------------
-# Tabs — all 6
+# Tabs
 # -----------------------
 tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Recommendations", "Stock Data", "AI Analysis", "News", "Comparison & DCF", "Chat"
@@ -360,7 +350,7 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab0:
     st.markdown("### 📊 Recommended for You")
     st.caption(f"Based on: **{investment_type}** · **{risk} Risk** · **{horizon}-term** · **{goal}**")
-    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type, option_types)
+    recs = generate_recommendations(risk, horizon, goal, tuple(sector), investment_type, tuple(option_types))
     if isinstance(recs, dict) and "error" in recs:
         st.error(f"Could not generate recommendations: {recs['error']}")
     else:
@@ -395,7 +385,7 @@ with tab0:
                     st.session_state.ticker_input = ticker_symbol
                     st.session_state.chat_history = []
                     st.rerun()
-            st.markdown("<hr style='margin: 6px 0; border-color:#e2e6ef;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 6px 0; border-color:#cccccc;'>", unsafe_allow_html=True)
 
 # -----------------------
 # Tab 1 — Stock Data
@@ -416,14 +406,14 @@ with tab1:
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=history.index, y=history["Close"], mode="lines", name="Close"))
                 fig.update_layout(title=f"{current_ticker} 6-Month Price History", xaxis_title="Date",
-                                  yaxis_title="Price ($)", paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                                  yaxis_title="Price ($)", paper_bgcolor="#f5f5f5", plot_bgcolor="#f5f5f5",
                                   font=dict(color="#111111"), height=450)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No historical data available for chart.")
 
 # -----------------------
-# Tab 2 — AI Analysis (no Refresh button)
+# Tab 2 — AI Analysis
 # -----------------------
 with tab2:
     if st.session_state.last_ticker:
@@ -446,7 +436,7 @@ with tab2:
             if st.button("🧠 Generate Analysis", key="generate_analysis_btn"):
                 with st.spinner(f"Analysing {current_ticker}..."):
                     generated = generate_single_analysis(current_ticker, risk, horizon, goal,
-                                                         tuple(sector), investment_type, option_types)
+                                                         tuple(sector), investment_type, tuple(option_types))
                 if isinstance(generated, dict) and "error" in generated:
                     st.error(f"Could not generate analysis: {generated['error']}")
                 else:
@@ -474,10 +464,10 @@ with tab3:
             st.markdown("---")
             st.markdown("#### 🔗 Find Official Reports")
             st.markdown(
-                f"- [SEC Filings (EDGAR)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={current_ticker}&type=10-K&dateb=&owner=include&count=10) — Annual (10-K) and Quarterly (10-Q) reports\n"
-                f"- [Macrotrends Financials](https://www.macrotrends.net/stocks/research?search={current_ticker}) — Income statement, balance sheet, cash flow\n"
-                f"- [Yahoo Finance](https://finance.yahoo.com/quote/{current_ticker}/financials/) — Earnings and financials\n"
-                f"- [Seeking Alpha](https://seekingalpha.com/symbol/{current_ticker}/earnings) — Earnings coverage and analysis"
+                f"- [SEC Filings (EDGAR)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={current_ticker}&type=10-K&dateb=&owner=include&count=10)\n"
+                f"- [Macrotrends Financials](https://www.macrotrends.net/stocks/research?search={current_ticker})\n"
+                f"- [Yahoo Finance](https://finance.yahoo.com/quote/{current_ticker}/financials/)\n"
+                f"- [Seeking Alpha](https://seekingalpha.com/symbol/{current_ticker}/earnings)"
             )
         else:
             st.info("Click **Load / Refresh News** to fetch the latest report for this stock.")
@@ -522,12 +512,6 @@ with tab4:
             st.caption(f"Row highlighted in blue = **{current_ticker}** · SPY = S&P 500 benchmark proxy")
             st.dataframe(df.style.apply(highlight_main, axis=1), use_container_width=True)
 
-            # P/E bar chart
-            pe_vals = {row["Ticker"]: float(row["P/E (TTM)"]) for row in all_fundamentals
-                       if row.get("P/E (TTM)") != "N/A" and row.get("P/E (TTM)") is not None
-                       and str(row.get("P/E (TTM)","")).replace(".","").lstrip("-").isdigit() or
-                       (lambda v: v != "N/A" and v is not None and str(v).replace(".","").lstrip("-").replace("e","").replace("+","").isdigit())(row.get("P/E (TTM)"))}
-            # simpler approach
             pe_vals = {}
             for row in all_fundamentals:
                 t = row.get("Ticker")
@@ -543,11 +527,10 @@ with tab4:
                 fig_pe = go.Figure(go.Bar(x=list(pe_vals.keys()), y=list(pe_vals.values()),
                                           marker_color=colors, text=[str(v) for v in pe_vals.values()], textposition="outside"))
                 fig_pe.update_layout(title="P/E Ratio Comparison", yaxis_title="P/E (TTM)",
-                                     paper_bgcolor="#ffffff", plot_bgcolor="#f5f7fb",
+                                     paper_bgcolor="#f5f5f5", plot_bgcolor="#e8e8e8",
                                      font=dict(color="#111"), height=360, showlegend=False)
                 st.plotly_chart(fig_pe, use_container_width=True)
 
-            # Net Margin bar chart
             margin_vals = {}
             for row in all_fundamentals:
                 t = row.get("Ticker")
@@ -563,7 +546,7 @@ with tab4:
                 fig_margin = go.Figure(go.Bar(x=list(margin_vals.keys()), y=list(margin_vals.values()),
                                               marker_color=colors2, text=[f"{v}%" for v in margin_vals.values()], textposition="outside"))
                 fig_margin.update_layout(title="Net Margin Comparison (%)", yaxis_title="Net Margin (%)",
-                                         paper_bgcolor="#ffffff", plot_bgcolor="#f5f7fb",
+                                         paper_bgcolor="#f5f5f5", plot_bgcolor="#e8e8e8",
                                          font=dict(color="#111"), height=360, showlegend=False)
                 st.plotly_chart(fig_margin, use_container_width=True)
         else:
@@ -572,18 +555,29 @@ with tab4:
         # DCF Section
         st.markdown("---")
         st.markdown("### 🧮 DCF Valuation Model")
-        st.caption("A Discounted Cash Flow (DCF) model estimates what a company is *worth today* based on the cash it's expected to generate in the future. Click below to generate one.")
+        st.caption("A Discounted Cash Flow (DCF) model estimates what a company is *worth today* based on the cash it's expected to generate in the future.")
         dcf_cache_key = f"dcf_{current_ticker}"
         if st.button("📐 Create DCF Model", key="dcf_btn"):
             with st.spinner("🔍 Fetching financials and building DCF model — this may take 30–60 seconds..."):
                 dcf_result = generate_dcf(current_ticker)
             st.session_state[dcf_cache_key] = dcf_result
+
         if dcf_cache_key in st.session_state:
             st.markdown("---")
-            st.markdown(st.session_state[dcf_cache_key])
+            dcf_text = st.session_state[dcf_cache_key]
+            # Clean up any leftover LaTeX delimiters
+            dcf_text = re.sub(r'\\\[', '\n', dcf_text)
+            dcf_text = re.sub(r'\\\]', '\n', dcf_text)
+            dcf_text = re.sub(r'\\\(', '', dcf_text)
+            dcf_text = re.sub(r'\\\)', '', dcf_text)
+            # Render section by section so markdown tables display correctly
+            sections = dcf_text.split('\n\n')
+            for section in sections:
+                if section.strip():
+                    st.markdown(section, unsafe_allow_html=True)
 
 # -----------------------
-# Tab 5 — Chat (Enter key supported via st.form)
+# Tab 5 — Chat
 # -----------------------
 with tab5:
     st.markdown("### 💬 Ask About This Investment")
@@ -604,45 +598,79 @@ with tab5:
                     f"Risk Rating: {analysis.get('Risk Rating','N/A')}. "
                     f"Alignment with Goals: {analysis.get('Alignment with Goals','N/A')}."
                 )
+            news_cache_key = f"news_{ticker}"
+            if news_cache_key in st.session_state:
+                context_parts.append(f"News report for {ticker}: {st.session_state[news_cache_key][:2000]}")
+            dcf_cache_key = f"dcf_{ticker}"
+            if dcf_cache_key in st.session_state:
+                context_parts.append(f"DCF analysis for {ticker}: {st.session_state[dcf_cache_key][:2000]}")
+            comp_cache_key = f"fund_{ticker}"
+            if comp_cache_key in st.session_state:
+                funds = st.session_state[comp_cache_key]
+                if funds:
+                    context_parts.append(f"Peer comparison data: {json.dumps(funds)}")
+        recs = st.session_state.get("rec_analysis_cache", {})
+        if recs:
+            context_parts.append(f"Recommended stocks context: {json.dumps(recs)}")
         context_parts.append(
             f"User investment profile — Risk Tolerance: {risk}, Horizon: {horizon}, Goal: {goal}, "
             f"Investment Type: {investment_type}, Preferred Sectors: {', '.join(sector) if sector else 'None specified'}."
         )
         return " ".join(context_parts)
 
-    with st.form(key="chat_form", clear_on_submit=True):
-        chat_col, send_col = st.columns([5, 1])
-        with chat_col:
-            chat_input = st.text_input("Ask a question about this investment...", key="chat_input")
-        with send_col:
-            st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
-            send_clicked = st.form_submit_button("Send", use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+    # Display chat history
+    for chat in st.session_state.chat_history:
+        if chat["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(chat["content"])
+        elif chat["role"] == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(chat["content"])
 
-    if send_clicked and chat_input:
+    # Chat input — Enter key works natively with st.chat_input
+    chat_input = st.chat_input("Ask anything about this stock or your portfolio...")
+
+    if chat_input:
         st.session_state.chat_history.append({"role": "user", "content": chat_input})
+        with st.chat_message("user"):
+            st.markdown(chat_input)
+
         context = build_chat_context(current_ticker)
         system_prompt = (
-            "You are an expert AI financial analyst and investment advisor with deep knowledge of "
-            "equity markets, macroeconomics, company fundamentals, and investment strategy. "
-            "Give thorough, insightful, well-structured answers — like consulting a senior financial analyst. "
-            "Draw on the context provided AND your broader knowledge of the company, sector, competitive landscape, "
-            "recent news, earnings history, and analyst sentiment. "
+            "You are an expert AI financial analyst and investment advisor. "
+            "You have access to web search — always search for the latest news, earnings, analyst ratings, "
+            "and price targets before answering. Give thorough, insightful, well-structured answers. "
+            "Draw on the context provided AND your broader knowledge of the company, sector, and market. "
             "Use bullet points or numbered lists where appropriate. Be honest about risks. "
-            "Tailor answers to the user's investment profile. Do not give vague answers.\n\n"
-            f"CONTEXT:\n{context}"
+            "Tailor answers to the user's investment profile.\n\n"
+            f"CONTEXT FROM APP:\n{context}"
         )
-        messages = [{"role": "system", "content": system_prompt}] + st.session_state.chat_history
-        with st.spinner("🤔 AI is thinking..."):
-            try:
-                resp = client.chat.completions.create(model="gpt-5-mini", messages=messages, max_completion_tokens=1000, temperature=0.7)
-                st.session_state.chat_history.append({"role": "assistant", "content": resp.choices[0].message.content})
-            except Exception as e:
-                st.error(f"Error generating response: {e}")
-        st.rerun()
 
-    for chat in reversed(st.session_state.chat_history):
-        if chat["role"] == "user":
-            st.markdown(f"**You:** {chat['content']}")
-        else:
-            st.markdown(f"**AI:** {chat['content']}")
+        messages = [{"role": "system", "content": system_prompt}] + [
+            {"role": m["role"], "content": m["content"]}
+            for m in st.session_state.chat_history
+        ]
+
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    resp = client.chat.completions.create(
+                        model="gpt-4o-search-preview",
+                        web_search_options={"search_context_size": "high"},
+                        messages=messages,
+                    )
+                    reply = resp.choices[0].message.content
+                except Exception:
+                    try:
+                        resp = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=messages,
+                            max_tokens=1000,
+                            temperature=0.7
+                        )
+                        reply = resp.choices[0].message.content
+                    except Exception as e:
+                        reply = f"Error: {str(e)}"
+            st.markdown(reply)
+
+        st.session_state.chat_history.append({"role": "assistant", "content": reply})
