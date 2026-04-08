@@ -263,12 +263,12 @@ What are the 3-4 biggest risks to this stock right now, explained in plain Engli
 
 Be thorough, use plain language throughout, and aim for 700-1000 words total. Always search for the latest available data before writing."""
     try:
-        response = client.chat.completions.create(
+        # Use Responses API which natively supports web_search_preview
+        response = client.responses.create(
             model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}],
             tools=[{"type": "web_search_preview"}],
-            tool_choice="auto",
-            max_completion_tokens=1500
+            input=prompt,
+            max_output_tokens=1500
         )
         full_text = ""
         for block in response.output:
@@ -280,7 +280,7 @@ Be thorough, use plain language throughout, and aim for 700-1000 words total. Al
                 full_text += block.text
         return full_text.strip() if full_text else "Could not generate report."
     except Exception as e:
-        # Fallback without web search tool if API doesn't support it
+        # Fallback: Chat Completions without web search
         try:
             response = client.chat.completions.create(
                 model="gpt-5-mini",
@@ -327,12 +327,12 @@ Compare the DCF implied price to the current market price. Is the stock underval
 
 Write everything in plain English so a non-finance reader can follow along. Complete the full analysis without asking any questions."""
     try:
-        response = client.chat.completions.create(
+        # Use Responses API which natively supports web_search_preview
+        response = client.responses.create(
             model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}],
             tools=[{"type": "web_search_preview"}],
-            tool_choice="auto",
-            max_completion_tokens=2000
+            input=prompt,
+            max_output_tokens=2000
         )
         full_text = ""
         for block in response.output:
