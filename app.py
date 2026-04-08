@@ -263,24 +263,15 @@ What are the 3-4 biggest risks to this stock right now, explained in plain Engli
 
 Be thorough, use plain language throughout, and aim for 700-1000 words total. Always search for the latest available data before writing."""
     try:
-        # Use Responses API which natively supports web_search_preview
-        response = client.responses.create(
-            model="gpt-5-mini",
-            tools=[{"type": "web_search_preview"}],
-            input=prompt,
-            max_output_tokens=1500
+        # Use gpt-4o-search-preview with web_search_options for live web access
+        response = client.chat.completions.create(
+            model="gpt-4o-search-preview",
+            web_search_options={"search_context_size": "high"},
+            messages=[{"role": "user", "content": prompt}]
         )
-        full_text = ""
-        for block in response.output:
-            if hasattr(block, "content"):
-                for item in block.content:
-                    if hasattr(item, "text"):
-                        full_text += item.text
-            elif hasattr(block, "text"):
-                full_text += block.text
-        return full_text.strip() if full_text else "Could not generate report."
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        # Fallback: Chat Completions without web search
+        # Fallback: gpt-5-mini without live search
         try:
             response = client.chat.completions.create(
                 model="gpt-5-mini",
@@ -327,23 +318,15 @@ Compare the DCF implied price to the current market price. Is the stock underval
 
 Write everything in plain English so a non-finance reader can follow along. Complete the full analysis without asking any questions."""
     try:
-        # Use Responses API which natively supports web_search_preview
-        response = client.responses.create(
-            model="gpt-5-mini",
-            tools=[{"type": "web_search_preview"}],
-            input=prompt,
-            max_output_tokens=2000
+        # Use gpt-4o-search-preview with web_search_options for live web access
+        response = client.chat.completions.create(
+            model="gpt-4o-search-preview",
+            web_search_options={"search_context_size": "high"},
+            messages=[{"role": "user", "content": prompt}]
         )
-        full_text = ""
-        for block in response.output:
-            if hasattr(block, "content"):
-                for item in block.content:
-                    if hasattr(item, "text"):
-                        full_text += item.text
-            elif hasattr(block, "text"):
-                full_text += block.text
-        return full_text.strip() if full_text else "Could not generate DCF."
+        return response.choices[0].message.content.strip()
     except Exception as e:
+        # Fallback: gpt-5-mini without live search
         try:
             response = client.chat.completions.create(
                 model="gpt-5-mini",
