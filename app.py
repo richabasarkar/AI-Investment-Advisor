@@ -44,7 +44,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.markdown("""
 <div class="header-banner">
-    <h1>🦈SharkFIN</h1>
+    <h1>SharkFIN</h1>
     <p>Enter a stock ticker to get real-time data, AI-powered analysis, and personalized insights based on your investment profile.</p>
 </div>
 """, unsafe_allow_html=True)
