@@ -675,7 +675,7 @@ with tab3:
         st.rerun()
 
     # Display chat history
-    for chat in st.session_state.chat_history:
+    for chat in reversed(st.session_state.chat_history):
         if chat["role"] == "user":
             st.markdown(f"**You:** {chat['content']}")
         else:
