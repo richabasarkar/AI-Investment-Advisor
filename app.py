@@ -12,8 +12,7 @@ st.set_page_config(page_title="SharkFIN", page_icon="🦈", layout="wide")
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
-    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-    html, body, [class*="css"], p, h1, h2, h3, h4, h5, h6, span:not(.material-icons), div, button, input, label { font-family: 'Playfair Display', serif !important; }
+    html, body, [class*="css"], p, h1, h2, h3, h4, h5, h6, div, button, input, label { font-family: 'Playfair Display', serif !important; }
     .stApp { background-color: #e8e8e8; color: #111111; }
     .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
     .header-banner h1 { font-size: 5rem; font-weight: 900; color: #111111; letter-spacing: 4px; }
@@ -32,9 +31,30 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f0f0; border-right: 1px solid #cccccc; }
     hr { border-color: #cccccc; }
     [data-testid="stChatMessage"] { background-color: #f5f5f5; border: 1px solid #cccccc; border-radius: 12px; margin-bottom: 8px; }
-    button[data-testid="collapsedControl"] { font-family: 'Material Icons' !important; }
-    button[data-testid="collapsedControl"] span { font-family: 'Material Icons' !important; font-size: 24px !important; color: #111111 !important; line-height: 1 !important; letter-spacing: normal !important; text-transform: none !important; display: inline-block !important; word-wrap: normal !important; -webkit-font-feature-settings: 'liga' !important; font-feature-settings: 'liga' !important; -webkit-font-smoothing: antialiased !important; }
+    button[data-testid="collapsedControl"] { display: none !important; }
+    .sidebar-toggle { position: fixed; top: 50%; left: 0; transform: translateY(-50%); z-index: 99999; }
+    .sidebar-toggle button { background: #111111 !important; color: white !important; border: none !important; padding: 10px 8px !important; cursor: pointer !important; font-size: 20px !important; border-radius: 0 8px 8px 0 !important; line-height: 1 !important; font-family: sans-serif !important; }
 </style>
+""", unsafe_allow_html=True)
+
+# Custom sidebar toggle button
+st.markdown("""
+<div class="sidebar-toggle">
+    <button onclick="
+        var sidebar = window.parent.document.querySelector('[data-testid=stSidebar]');
+        var collapsed = sidebar.getAttribute('data-collapsed');
+        if (collapsed === 'true') {
+            sidebar.setAttribute('data-collapsed', 'false');
+            sidebar.style.width = '21rem';
+            this.innerHTML = '◀';
+        } else {
+            sidebar.setAttribute('data-collapsed', 'true');
+            sidebar.style.width = '0';
+            sidebar.style.overflow = 'hidden';
+            this.innerHTML = '▶';
+        }
+    ">◀</button>
+</div>
 """, unsafe_allow_html=True)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -159,7 +179,7 @@ def get_extended_fundamentals(ticker):
 def get_competitors(ticker):
     try:
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": (
                 f"List the 4 most direct publicly traded competitors of {ticker} (stock ticker). "
                 "Return ONLY a JSON array of ticker symbols, e.g. [\"AAPL\",\"MSFT\"]. No explanation, no markdown."
@@ -203,7 +223,7 @@ STRICT RULES:
 FORMAT:
 [{{"ticker":"X","company":"Full Name","reason":"One sentence.","recommendation":"Buy","reasoning":"Detail.","risk_rating":"Low","alignment":"Goal alignment."}}]"""
     try:
-        response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
+        response = client.chat.completions.create(model="gpt-5-mini", messages=[{"role": "user", "content": prompt}])
         text_response = response.choices[0].message.content.strip()
         if text_response.startswith("```"):
             text_response = text_response.split("```")[1]
@@ -225,7 +245,7 @@ USER PROFILE:
 Return ONLY a valid JSON object, no markdown.
 FORMAT: {{"Recommendation":"Buy/Hold/Avoid","Reasoning":"Detail.","Risk Rating":"Low/Medium/High","Alignment with Goals":"Detail."}}"""
     try:
-        response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
+        response = client.chat.completions.create(model="gpt-5-mini", messages=[{"role": "user", "content": prompt}])
         text_response = response.choices[0].message.content.strip()
         if text_response.startswith("```"):
             text_response = text_response.split("```")[1]
@@ -277,7 +297,7 @@ Be thorough, use plain language, aim for 700-1000 words. Always search for the l
     except Exception:
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-mini",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1500
             )
@@ -331,7 +351,7 @@ Write everything in plain English. Complete the full analysis without asking any
     except Exception:
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-mini",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000
             )
@@ -618,7 +638,7 @@ with tab5:
         )
         return " ".join(context_parts)
 
-    # Chat input at the top — Enter key works natively
+    # Chat input — Enter key works natively
     chat_input = st.chat_input("Ask anything about this stock or your portfolio...")
 
     if chat_input:
@@ -651,7 +671,7 @@ with tab5:
             except Exception:
                 try:
                     resp = client.chat.completions.create(
-                        model="gpt-4o-mini",
+                        model="gpt-5-mini",
                         messages=messages,
                         max_tokens=1000,
                         temperature=0.7
@@ -663,11 +683,23 @@ with tab5:
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
         st.rerun()
 
-    # Display chat history in reverse — newest on top
+    # Display chat history — newest on top, no icons
     for chat in reversed(st.session_state.chat_history):
         if chat["role"] == "user":
-            with st.chat_message("user"):
-                st.markdown(chat["content"])
+            st.markdown(f"""
+            <div style="background:#e0e0e0; border:1px solid #cccccc; border-radius:12px;
+                        padding:12px 16px; margin-bottom:8px;">
+                <div style="font-size:0.75rem; color:#555; text-transform:uppercase;
+                            letter-spacing:1px; margin-bottom:4px; font-family:'Playfair Display',serif;">You</div>
+                <div style="color:#111111; font-family:'Playfair Display',serif;">{chat["content"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
         elif chat["role"] == "assistant":
-            with st.chat_message("assistant"):
-                st.markdown(chat["content"])
+            st.markdown(f"""
+            <div style="background:#f5f5f5; border:1px solid #cccccc; border-radius:12px;
+                        padding:12px 16px; margin-bottom:8px;">
+                <div style="font-size:0.75rem; color:#555; text-transform:uppercase;
+                            letter-spacing:1px; margin-bottom:4px; font-family:'Playfair Display',serif;">SharkFIN</div>
+                <div style="color:#111111; font-family:'Playfair Display',serif;">{chat["content"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
