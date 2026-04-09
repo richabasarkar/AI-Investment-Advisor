@@ -13,7 +13,7 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
     @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-    * { font-family: 'Playfair Display', serif !important; }
+    html, body, [class*="css"], p, h1, h2, h3, h4, h5, h6, span:not(.material-icons), div, button, input, label { font-family: 'Playfair Display', serif !important; }
     .stApp { background-color: #e8e8e8; color: #111111; }
     .header-banner { background: #f5f5f5; border: 1px solid #cccccc; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; text-align: center; }
     .header-banner h1 { font-size: 5rem; font-weight: 900; color: #111111; letter-spacing: 4px; }
@@ -32,7 +32,8 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f0f0; border-right: 1px solid #cccccc; }
     hr { border-color: #cccccc; }
     [data-testid="stChatMessage"] { background-color: #f5f5f5; border: 1px solid #cccccc; border-radius: 12px; margin-bottom: 8px; }
-    button[data-testid="collapsedControl"] span { font-family: 'Material Icons' !important; font-size: 24px !important; color: #111111 !important; }
+    button[data-testid="collapsedControl"] { font-family: 'Material Icons' !important; }
+    button[data-testid="collapsedControl"] span { font-family: 'Material Icons' !important; font-size: 24px !important; color: #111111 !important; line-height: 1 !important; letter-spacing: normal !important; text-transform: none !important; display: inline-block !important; word-wrap: normal !important; -webkit-font-feature-settings: 'liga' !important; font-feature-settings: 'liga' !important; -webkit-font-smoothing: antialiased !important; }
 </style>
 """, unsafe_allow_html=True)
 
